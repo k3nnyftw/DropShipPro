@@ -330,12 +330,17 @@ router.get("/feature-access/:feature", async (req: Request, res: Response) => {
     // DEVELOPMENT MODE: All features are accessible
     // In production, you would remove this and use the actual subscription check
     if (process.env.NODE_ENV !== "production") {
-      return res.json({
-        feature,
-        hasAccess: true, // Always grant access in development
-        plan: "developer",
-        upgradeTo: null
-      });
+      const isDeveloperMode = true; // Set this to false to test subscription restrictions locally
+      
+      if (isDeveloperMode) {
+        console.log(`[DEV MODE] Granting access to premium feature: ${feature}`);
+        return res.json({
+          feature,
+          hasAccess: true, // Always grant access in development
+          plan: "developer",
+          upgradeTo: null
+        });
+      }
     }
     
     // Get user's plan

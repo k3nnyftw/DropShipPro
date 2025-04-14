@@ -4,14 +4,29 @@ import { PriceOptimization } from "@/components/store/price-optimization";
 import { InventoryAutomation } from "@/components/store/inventory-automation";
 import { AutoFulfillment } from "@/components/orders/auto-fulfillment";
 import { DemandForecasting } from "@/components/automation/demand-forecasting";
-import { DollarSign, Package, Truck, Sparkles, Brain } from "lucide-react";
+import { FeatureGate } from "@/components/subscription/feature-gate";
+import { DollarSign, Package, Truck, Sparkles, Brain, Zap } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { PlanSelector } from "@/components/subscription/plan-selector";
+import { useState } from "react";
 
 const Automation: React.FC = () => {
+  const [planSelectorOpen, setPlanSelectorOpen] = useState(false);
+  
   return (
     <>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 font-display">Automation Center</h1>
-        <p className="text-gray-600">Powerful automation tools for your dropshipping business</p>
+      <div className="mb-6 flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800 font-display">Automation Center</h1>
+          <p className="text-gray-600">Powerful automation tools for your dropshipping business</p>
+        </div>
+        <Button variant="outline" onClick={() => setPlanSelectorOpen(true)}>
+          <Zap className="mr-2 h-4 w-4" />
+          Subscription Plans
+        </Button>
+        {planSelectorOpen && (
+          <PlanSelector open={planSelectorOpen} onOpenChange={setPlanSelectorOpen} />
+        )}
       </div>
 
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border rounded-lg p-6 mb-8">
@@ -51,19 +66,43 @@ const Automation: React.FC = () => {
         </TabsList>
 
         <TabsContent value="demand-forecasting">
-          <DemandForecasting />
+          <FeatureGate
+            featureName="demandForecasting"
+            featureTitle="AI-Powered Demand Forecasting"
+            featureDescription="Predict future inventory needs with our AI algorithm to avoid stockouts and optimize cash flow."
+          >
+            <DemandForecasting />
+          </FeatureGate>
         </TabsContent>
 
         <TabsContent value="price-optimization">
-          <PriceOptimization />
+          <FeatureGate
+            featureName="automatedPriceOptimization"
+            featureTitle="Automated Price Optimization"
+            featureDescription="Maximize profits with dynamic pricing that responds to market conditions, competitor prices, and demand patterns."
+          >
+            <PriceOptimization />
+          </FeatureGate>
         </TabsContent>
 
         <TabsContent value="inventory-management">
-          <InventoryAutomation />
+          <FeatureGate
+            featureName="automatedOrderFulfillment"
+            featureTitle="Automated Inventory Management"
+            featureDescription="Keep perfect inventory levels with automatic reordering based on sales velocity and supplier lead times."
+          >
+            <InventoryAutomation />
+          </FeatureGate>
         </TabsContent>
 
         <TabsContent value="order-fulfillment">
-          <AutoFulfillment />
+          <FeatureGate
+            featureName="automatedOrderFulfillment"
+            featureTitle="Automated Order Fulfillment"
+            featureDescription="Process orders automatically with no intervention needed - from purchase to delivery tracking."
+          >
+            <AutoFulfillment />
+          </FeatureGate>
         </TabsContent>
       </Tabs>
     </>
