@@ -22,7 +22,8 @@ import {
   Check,
   X,
   Mail,
-  MessageSquare 
+  MessageSquare,
+  ExternalLink
 } from "lucide-react";
 
 interface Supplier {
@@ -36,6 +37,7 @@ interface Supplier {
   shippingTime: string;
   returnPolicy: string;
   imageUrl: string;
+  website?: string;
 }
 
 interface SupplierDetailModalProps {
