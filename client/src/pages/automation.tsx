@@ -24,9 +24,7 @@ const Automation: React.FC = () => {
           <Zap className="mr-2 h-4 w-4" />
           Subscription Plans
         </Button>
-        {planSelectorOpen && (
-          <PlanSelector open={planSelectorOpen} onOpenChange={setPlanSelectorOpen} />
-        )}
+        <PlanSelector open={planSelectorOpen} onOpenChange={setPlanSelectorOpen} />
       </div>
 
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border rounded-lg p-6 mb-8">
