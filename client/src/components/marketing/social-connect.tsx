@@ -280,15 +280,17 @@ export default function SocialConnect() {
                         <h3 className="font-semibold">
                           {account.platform.charAt(0).toUpperCase() + account.platform.slice(1)}
                         </h3>
-                        {account.status === 'active' && (
-                          <Badge className="ml-2 bg-green-100 text-green-800">Connected</Badge>
-                        )}
-                        {account.status === 'pending' && (
-                          <Badge className="ml-2 bg-amber-100 text-amber-800">Pending</Badge>
-                        )}
-                        {account.status === 'error' && (
-                          <Badge className="ml-2 bg-red-100 text-red-800">Connection Error</Badge>
-                        )}
+                        <div className="ml-2">
+                          {account.status === 'active' && (
+                            <Badge className="bg-green-100 text-green-800">Connected</Badge>
+                          )}
+                          {account.status === 'pending' && (
+                            <Badge className="bg-amber-100 text-amber-800">Pending</Badge>
+                          )}
+                          {account.status === 'error' && (
+                            <Badge className="bg-red-100 text-red-800">Connection Error</Badge>
+                          )}
+                        </div>
                       </div>
                       <p className="text-sm text-muted-foreground">@{account.username}</p>
                       {account.error && (
@@ -335,7 +337,7 @@ export default function SocialConnect() {
 
       {/* Connect Account Modal */}
       <Dialog open={showConnectModal} onOpenChange={setShowConnectModal}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[500px]" aria-describedby="connect-social-account-description">
           <DialogHeader>
             <DialogTitle>Connect Social Media Account</DialogTitle>
             <DialogDescription>
