@@ -136,7 +136,8 @@ export class MemStorage implements IStorage {
         price: "18.50",
         minOrder: 10,
         shippingTime: "10-15 days",
-        returnPolicy: "30-day"
+        returnPolicy: "30-day",
+        website: "https://www.shentech-electronics.com"
       },
       {
         name: "TechPro Solutions",
@@ -147,7 +148,8 @@ export class MemStorage implements IStorage {
         price: "17.25",
         minOrder: 5,
         shippingTime: "12-18 days",
-        returnPolicy: "15-day"
+        returnPolicy: "15-day",
+        website: "https://www.techpro-solutions.cn"
       },
       {
         name: "GlobalAudio Inc.",
@@ -158,7 +160,8 @@ export class MemStorage implements IStorage {
         price: "22.00",
         minOrder: 20,
         shippingTime: "7-10 days",
-        returnPolicy: "60-day"
+        returnPolicy: "60-day",
+        website: "https://www.globalaudio-inc.com"
       }
     ];
 
