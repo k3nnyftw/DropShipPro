@@ -1,325 +1,176 @@
 /**
  * Order Fulfillment Service
  * 
- * This service automates the order fulfillment process by:
- * 1. Automatically sending orders to suppliers
- * 2. Tracking fulfillment status
- * 3. Notifying customers of shipment updates
+ * This service automates the order fulfillment process:
+ * 1. Automatically processes orders with suppliers when payment is received
+ * 2. Tracks shipment status and provides updates
+ * 3. Selects optimal supplier for each product based on price, shipping time, and reliability
  */
 
 import { storage } from "../storage";
-import { Order, Supplier } from "../../shared/schema";
+import { Order } from "../../shared/schema";
 
-interface FulfillmentRequest {
+interface FulfillmentResult {
   orderId: number;
-  supplierIds?: number[];  // If not provided, the system will auto-select suppliers
-  fulfillmentMode?: 'automatic' | 'manual';
-}
-
-interface FulfillmentResponse {
-  orderId: number;
-  status: 'success' | 'partial' | 'failed';
+  orderNumber: string;
+  success: boolean;
   supplierIds: number[];
-  trackingNumbers?: string[];
-  estimatedDelivery?: Date;
+  trackingNumbers: string[];
+  estimatedDelivery: Date | null;
   message: string;
+  fulfillmentDate: Date;
 }
 
-interface OrderSupplierMatch {
+interface FulfillmentTracking {
   orderId: number;
-  supplierId: number;
-  productIds: number[];
-  fulfillmentStatus: 'pending' | 'processing' | 'shipped' | 'delivered' | 'failed';
-  trackingNumber?: string;
-  shippingMethod?: string;
-  estimatedDelivery?: Date;
-}
-
-interface SupplierRequestPayload {
-  orderId: number;
-  products: {
-    productId: number;
-    name: string;
-    quantity: number;
-    price: string;
-  }[];
-  shippingAddress: {
-    name: string;
-    address: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    country: string;
-  };
-  customerOrderId: string;
-}
-
-/**
- * Automatically fulfill an order by sending it to the appropriate suppliers
- * @param request The fulfillment request containing order information
- * @returns Promise resolving to fulfillment response with status and details
- */
-export async function fulfillOrder(
-  request: FulfillmentRequest
-): Promise<FulfillmentResponse> {
-  const { orderId, supplierIds = [], fulfillmentMode = 'automatic' } = request;
-  
-  // Get the order
-  const order = await storage.getOrder(orderId);
-  if (!order) {
-    throw new Error(`Order with ID ${orderId} not found`);
-  }
-  
-  // Check if order is already being fulfilled or completed
-  if (order.fulfillment === 'shipped' || order.fulfillment === 'delivered') {
-    return {
-      orderId,
-      status: 'success',
-      supplierIds: [],
-      message: `Order is already in ${order.fulfillment} status`
-    };
-  }
-  
-  // In a real implementation, this would match products in the order to suppliers
-  // For this demo, we'll simulate the process
-  
-  // If no suppliers specified, auto-select based on product availability and ratings
-  let selectedSupplierIds = supplierIds;
-  if (selectedSupplierIds.length === 0) {
-    // Simulate auto-selecting suppliers
-    const allSuppliers = await storage.getAllSuppliers();
-    const rand = Math.floor(Math.random() * Math.min(3, allSuppliers.length));
-    selectedSupplierIds = [allSuppliers[rand].id];
-  }
-  
-  // Simulate sending order to suppliers
-  const supplierMatches: OrderSupplierMatch[] = [];
-  const trackingNumbers: string[] = [];
-  
-  for (const supplierId of selectedSupplierIds) {
-    try {
-      const supplier = await storage.getSupplier(supplierId);
-      if (!supplier) {
-        continue;
-      }
-      
-      // In a real implementation, this would call the supplier's API
-      const fulfillmentResult = await simulateSendToSupplier(order, supplier);
-      
-      supplierMatches.push({
-        orderId,
-        supplierId,
-        productIds: [1, 2], // In a real implementation, this would be the actual product IDs
-        fulfillmentStatus: 'processing',
-        trackingNumber: fulfillmentResult.trackingNumber,
-        shippingMethod: fulfillmentResult.shippingMethod,
-        estimatedDelivery: fulfillmentResult.estimatedDelivery
-      });
-      
-      if (fulfillmentResult.trackingNumber) {
-        trackingNumbers.push(fulfillmentResult.trackingNumber);
-      }
-    } catch (error) {
-      console.error(`Error fulfilling order with supplier ${supplierId}:`, error);
-    }
-  }
-  
-  // Update order status in database
-  if (supplierMatches.length > 0) {
-    // In a real implementation, you would update the order status in the database
-    console.log(`Order ${orderId} status updated to 'processing'`);
-    
-    // Simulate sending notification to customer
-    if (fulfillmentMode === 'automatic') {
-      await simulateCustomerNotification(order, 'processing');
-    }
-    
-    const estimatedDelivery = supplierMatches.reduce((latest, match) => {
-      if (!match.estimatedDelivery) return latest;
-      if (!latest) return match.estimatedDelivery;
-      return match.estimatedDelivery > latest ? match.estimatedDelivery : latest;
-    }, null as Date | null);
-    
-    return {
-      orderId,
-      status: selectedSupplierIds.length === supplierMatches.length ? 'success' : 'partial',
-      supplierIds: supplierMatches.map(match => match.supplierId),
-      trackingNumbers,
-      estimatedDelivery: estimatedDelivery || undefined,
-      message: 'Order sent to suppliers for fulfillment'
-    };
-  }
-  
-  return {
-    orderId,
-    status: 'failed',
-    supplierIds: [],
-    message: 'Failed to fulfill order with any supplier'
-  };
-}
-
-/**
- * Track an order's fulfillment status across suppliers
- * @param orderId The ID of the order to track
- * @returns Promise resolving to the current fulfillment status
- */
-export async function trackOrderFulfillment(
-  orderId: number
-): Promise<{
-  orderId: number;
-  status: string;
-  supplierUpdates: {
-    supplierId: number;
-    supplierName: string;
+  orderNumber: string;
+  status: 'processing' | 'fulfilled' | 'shipped' | 'in_transit' | 'delivered' | 'failed';
+  events: {
+    date: Date;
     status: string;
-    trackingNumber?: string;
-    trackingUrl?: string;
-    lastUpdate: Date;
-    estimatedDelivery?: Date;
+    location: string;
+    description: string;
   }[];
-}> {
+  estimatedDelivery: Date | null;
+  trackingNumbers: string[];
+  supplierIds: number[];
+}
+
+interface ScheduleConfig {
+  checkIntervalMinutes: number;
+  notifyCustomer: boolean;
+  autoSelectSupplier: boolean;
+  prioritizationStrategy: 'price' | 'speed' | 'reliability' | 'balanced';
+}
+
+/**
+ * Fulfill a specific order by sending it to the appropriate supplier(s)
+ * @param orderId The ID of the order to fulfill
+ * @returns Promise resolving to fulfillment result
+ */
+export async function fulfillOrder(orderId: number): Promise<FulfillmentResult> {
+  // Get the order
+  const order = await storage.getOrder(orderId);
+  if (!order) {
+    throw new Error(`Order with ID ${orderId} not found`);
+  }
+
+  // Check if order is ready for fulfillment
+  if (order.paymentStatus !== 'paid') {
+    throw new Error(`Order ${order.orderNumber} cannot be fulfilled: payment status is ${order.paymentStatus}`);
+  }
+
+  // In a real application, this would:
+  // 1. Determine the products in the order
+  // 2. Select the optimal supplier for each product
+  // 3. Send fulfillment requests to each supplier's API
+  // 4. Record tracking information
+  // 5. Update order status
+  
+  console.log(`Fulfilling order ${order.orderNumber} (ID: ${orderId})`);
+  
+  // For this demo, simulate the process
+  const result = await simulateFulfillment(order);
+  
+  // In a real app, we would update the order status in the database
+  console.log(`Order ${order.orderNumber} fulfillment result: ${result.success ? 'Success' : 'Failed'}`);
+  
+  return result;
+}
+
+/**
+ * Track the fulfillment status of an order
+ * @param orderId The ID of the order to track
+ * @returns Promise resolving to tracking information
+ */
+export async function trackOrderFulfillment(orderId: number): Promise<FulfillmentTracking> {
   // Get the order
   const order = await storage.getOrder(orderId);
   if (!order) {
     throw new Error(`Order with ID ${orderId} not found`);
   }
   
-  // In a real implementation, this would query the database for supplier matches
-  // and call supplier APIs for status updates
+  // In a real application, this would:
+  // 1. Get tracking information from supplier APIs
+  // 2. Consolidate information if multiple suppliers
+  // 3. Return current status
   
-  // For this demo, we'll simulate the tracking process
-  const currentDate = new Date();
-  // Randomly decide if the order is processing, shipped, or delivered based on its age
-  const orderAge = (currentDate.getTime() - new Date(order.createdAt).getTime()) / (1000 * 60 * 60 * 24);
-  
-  let overallStatus: string;
-  const suppliers = await storage.getAllSuppliers();
-  
-  // Select 1-2 random suppliers for this demo
-  const randSuppliers = [];
-  const randSupplier1 = suppliers[Math.floor(Math.random() * suppliers.length)];
-  randSuppliers.push(randSupplier1);
-  
-  // 50% chance of a second supplier
-  if (Math.random() > 0.5) {
-    const randSupplier2 = suppliers[Math.floor(Math.random() * suppliers.length)];
-    if (randSupplier2.id !== randSupplier1.id) {
-      randSuppliers.push(randSupplier2);
-    }
-  }
-  
-  // Determine status based on simulated order age
-  if (orderAge < 1) {
-    overallStatus = 'processing';
-  } else if (orderAge < 3) {
-    overallStatus = 'shipped';
-  } else {
-    overallStatus = 'delivered';
-  }
-  
-  // Generate tracking number format: 2 letters + 9 digits
-  const generateTrackingNumber = () => {
-    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const prefix = letters[Math.floor(Math.random() * 26)] + letters[Math.floor(Math.random() * 26)];
-    const numbers = Array(9).fill(0).map(() => Math.floor(Math.random() * 10)).join('');
-    return `${prefix}${numbers}`;
-  };
-  
-  // Generate supplier updates
-  const supplierUpdates = randSuppliers.map(supplier => {
-    // Simulate different statuses between suppliers
-    let supplierStatus = overallStatus;
-    if (overallStatus === 'shipped' && Math.random() > 0.7) {
-      supplierStatus = 'processing';
-    } else if (overallStatus === 'delivered' && Math.random() > 0.7) {
-      supplierStatus = 'shipped';
-    }
-    
-    const trackingNumber = generateTrackingNumber();
-    
-    // Calculate estimated delivery (2-7 days from now)
-    const estDelivery = new Date();
-    estDelivery.setDate(estDelivery.getDate() + 2 + Math.floor(Math.random() * 6));
-    
-    return {
-      supplierId: supplier.id,
-      supplierName: supplier.name,
-      status: supplierStatus,
-      trackingNumber,
-      trackingUrl: `https://track.carrier.com/${trackingNumber}`,
-      lastUpdate: new Date(currentDate.getTime() - Math.floor(Math.random() * 24 * 60 * 60 * 1000)),
-      estimatedDelivery: estDelivery
-    };
-  });
-  
+  // For this demo, we'll return simulated tracking data
   return {
-    orderId,
-    status: overallStatus,
-    supplierUpdates
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    status: determineTrackingStatus(order),
+    events: generateTrackingEvents(order),
+    estimatedDelivery: order.fulfillment === 'shipped' ? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) : null,
+    trackingNumbers: ['TN' + order.id + '123456', 'TN' + order.id + '789012'],
+    supplierIds: [1, 2] // Simulated supplier IDs
   };
 }
 
 /**
- * Automatically fulfill all pending orders that are ready for fulfillment
- * @returns Promise resolving to an array of fulfillment responses
+ * Automatically fulfill all orders that are paid but not yet fulfilled
+ * @returns Promise resolving to array of fulfillment results
  */
-export async function autoFulfillPendingOrders(): Promise<FulfillmentResponse[]> {
+export async function autoFulfillOrders(): Promise<FulfillmentResult[]> {
   // Get all orders
   const orders = await storage.getAllOrders();
   
-  // Filter for orders that are pending and paid
-  const pendingOrders = orders.filter(order => 
-    order.status === 'confirmed' && 
-    order.paymentStatus === 'paid' &&
-    (!order.fulfillment || order.fulfillment === 'pending')
+  // Filter for orders that are paid but not yet fulfilled
+  const ordersToFulfill = orders.filter(order => 
+    order.paymentStatus === 'paid' && 
+    (order.fulfillment !== 'shipped' && order.fulfillment !== 'delivered')
   );
   
-  console.log(`Found ${pendingOrders.length} pending orders for auto-fulfillment`);
+  console.log(`Auto-fulfilling ${ordersToFulfill.length} orders`);
   
   // Process each order
-  const fulfillmentResponses: FulfillmentResponse[] = [];
+  const results: FulfillmentResult[] = [];
   
-  for (const order of pendingOrders) {
+  for (const order of ordersToFulfill) {
     try {
-      const response = await fulfillOrder({
-        orderId: order.id,
-        fulfillmentMode: 'automatic'
-      });
-      
-      fulfillmentResponses.push(response);
+      const result = await fulfillOrder(order.id);
+      results.push(result);
     } catch (error) {
       console.error(`Error auto-fulfilling order ${order.id}:`, error);
-      fulfillmentResponses.push({
+      results.push({
         orderId: order.id,
-        status: 'failed',
+        orderNumber: order.orderNumber,
+        success: false,
         supplierIds: [],
-        message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
+        trackingNumbers: [],
+        estimatedDelivery: null,
+        message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        fulfillmentDate: new Date()
       });
     }
   }
   
-  return fulfillmentResponses;
+  return results;
 }
 
 /**
- * Schedule automatic order fulfillment to run periodically
- * @param intervalMinutes How often to check for new orders (in minutes)
+ * Schedule automatic order fulfillment
+ * @param config Configuration for automatic fulfillment
  * @returns Function to cancel the scheduled fulfillment
  */
-export function scheduleAutoFulfillment(intervalMinutes: number = 15): () => void {
-  // Convert minutes to milliseconds
-  const intervalMs = intervalMinutes * 60 * 1000;
+export function scheduleAutoFulfillment(config: ScheduleConfig): () => void {
+  const { checkIntervalMinutes } = config;
   
-  console.log(`Scheduling auto-fulfillment to run every ${intervalMinutes} minutes`);
+  // Convert minutes to milliseconds
+  const intervalMs = checkIntervalMinutes * 60 * 1000;
+  
+  console.log(`Scheduling automatic order fulfillment to run every ${checkIntervalMinutes} minutes`);
+  console.log(`Configuration: ${JSON.stringify(config)}`);
   
   // Set up the interval
   const intervalId = setInterval(async () => {
     try {
-      console.log('Running scheduled auto-fulfillment...');
-      const results = await autoFulfillPendingOrders();
-      console.log(`Auto-fulfillment complete: ${results.length} orders processed`);
+      console.log('Running scheduled order fulfillment...');
+      const results = await autoFulfillOrders();
+      const successCount = results.filter(r => r.success).length;
+      console.log(`Auto-fulfillment complete: ${successCount}/${results.length} orders fulfilled successfully`);
     } catch (error) {
-      console.error('Error in scheduled auto-fulfillment:', error);
+      console.error('Error in scheduled order fulfillment:', error);
     }
   }, intervalMs);
   
@@ -330,59 +181,145 @@ export function scheduleAutoFulfillment(intervalMinutes: number = 15): () => voi
 // --- Helper functions ---
 
 /**
- * Simulate sending an order to a supplier
- * In a real implementation, this would call the supplier's API
+ * Determine tracking status based on order information
+ * @param order The order
+ * @returns Tracking status
  */
-async function simulateSendToSupplier(
-  order: Order,
-  supplier: Supplier
-): Promise<{
-  success: boolean;
-  trackingNumber?: string;
-  shippingMethod?: string;
-  estimatedDelivery?: Date;
-}> {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  // 90% success rate for simulation
-  const success = Math.random() < 0.9;
-  
-  if (!success) {
-    return { success: false };
+function determineTrackingStatus(order: Order): 'processing' | 'fulfilled' | 'shipped' | 'in_transit' | 'delivered' | 'failed' {
+  if (order.status === 'delivered' || order.fulfillment === 'delivered') {
+    return 'delivered';
   }
   
-  // Generate random tracking number
-  const trackingNumber = `TRACK${Math.floor(Math.random() * 1000000000).toString().padStart(9, '0')}`;
+  if (order.status === 'shipped' || order.fulfillment === 'shipped') {
+    // Randomly choose between shipped and in_transit for demo purposes
+    return Math.random() > 0.5 ? 'shipped' : 'in_transit';
+  }
   
-  // Random shipping method
-  const shippingMethods = ['Standard', 'Expedited', 'Express'];
-  const shippingMethod = shippingMethods[Math.floor(Math.random() * shippingMethods.length)];
+  if (order.status === 'processing') {
+    return 'processing';
+  }
   
-  // Calculate estimated delivery (3-10 days from now)
-  const estimatedDelivery = new Date();
-  estimatedDelivery.setDate(estimatedDelivery.getDate() + 3 + Math.floor(Math.random() * 8));
+  if (order.status === 'cancelled') {
+    return 'failed';
+  }
   
-  return {
-    success: true,
-    trackingNumber,
-    shippingMethod,
-    estimatedDelivery
-  };
+  // Default
+  return 'fulfilled';
 }
 
 /**
- * Simulate sending notification to customer
- * In a real implementation, this would send an email or SMS
+ * Generate simulated tracking events for an order
+ * @param order The order
+ * @returns Array of tracking events
  */
-async function simulateCustomerNotification(
-  order: Order,
-  status: 'processing' | 'shipped' | 'delivered'
-): Promise<boolean> {
-  // Simulate notification delay
-  await new Promise(resolve => setTimeout(resolve, 300));
+function generateTrackingEvents(order: Order): { date: Date; status: string; location: string; description: string; }[] {
+  const events = [];
+  const orderDate = order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt || Date.now());
   
-  console.log(`[NOTIFICATION] Order #${order.orderNumber} is now ${status}. Email sent to ${order.customerEmail || 'customer'}.`);
+  // Order received
+  events.push({
+    date: orderDate,
+    status: 'order_placed',
+    location: 'Online',
+    description: 'Order placed by customer'
+  });
   
-  return true;
+  // Payment processed
+  events.push({
+    date: new Date(orderDate.getTime() + 1 * 60 * 60 * 1000), // 1 hour after order
+    status: 'payment_processed',
+    location: 'Payment Processor',
+    description: 'Payment successfully processed'
+  });
+  
+  // Order sent to supplier
+  events.push({
+    date: new Date(orderDate.getTime() + 2 * 60 * 60 * 1000), // 2 hours after order
+    status: 'fulfillment_initiated',
+    location: 'Fulfillment Center',
+    description: 'Order details sent to supplier for processing'
+  });
+  
+  // If order is shipped or delivered, add shipping events
+  if (order.status === 'shipped' || order.status === 'delivered' || 
+      order.fulfillment === 'shipped' || order.fulfillment === 'delivered') {
+    
+    // Shipped by supplier
+    events.push({
+      date: new Date(orderDate.getTime() + 24 * 60 * 60 * 1000), // 1 day after order
+      status: 'shipped',
+      location: 'Supplier Warehouse',
+      description: 'Package shipped by supplier'
+    });
+    
+    // In transit
+    events.push({
+      date: new Date(orderDate.getTime() + 48 * 60 * 60 * 1000), // 2 days after order
+      status: 'in_transit',
+      location: 'Transit Hub',
+      description: 'Package in transit to destination'
+    });
+    
+    // If delivered, add delivery event
+    if (order.status === 'delivered' || order.fulfillment === 'delivered') {
+      events.push({
+        date: new Date(orderDate.getTime() + 72 * 60 * 60 * 1000), // 3 days after order
+        status: 'delivered',
+        location: 'Customer Address',
+        description: 'Package delivered to customer'
+      });
+    }
+  }
+  
+  return events;
+}
+
+/**
+ * Simulate order fulfillment process
+ * @param order The order to fulfill
+ * @returns Promise resolving to fulfillment result
+ */
+async function simulateFulfillment(order: Order): Promise<FulfillmentResult> {
+  // Simulate API call delay
+  await new Promise(resolve => setTimeout(resolve, 500));
+  
+  // 95% success rate for simulation
+  const success = Math.random() < 0.95;
+  
+  if (!success) {
+    return {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      success: false,
+      supplierIds: [],
+      trackingNumbers: [],
+      estimatedDelivery: null,
+      message: 'Supplier API is currently unavailable. Please try again later.',
+      fulfillmentDate: new Date()
+    };
+  }
+  
+  // Generate tracking numbers
+  const trackingNumbers = [
+    'TN' + order.id + '123456',
+    'TN' + order.id + '789012'
+  ];
+  
+  // Simulate supplier selection
+  const supplierIds = [1, 2]; // In a real app, we would select based on products
+  
+  // Calculate estimated delivery (3-5 days from now)
+  const estimatedDelivery = new Date();
+  estimatedDelivery.setDate(estimatedDelivery.getDate() + 3 + Math.floor(Math.random() * 3));
+  
+  return {
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    success: true,
+    supplierIds,
+    trackingNumbers,
+    estimatedDelivery,
+    message: `Order successfully sent to ${supplierIds.length} suppliers for fulfillment. Estimated delivery: ${estimatedDelivery.toLocaleDateString()}`,
+    fulfillmentDate: new Date()
+  };
 }

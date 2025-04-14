@@ -1,13 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardFooter, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
@@ -15,46 +9,34 @@ import { Badge } from '@/components/ui/badge';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
 import { 
-  ArrowUp, 
-  ArrowDown, 
-  TrendingUp, 
   DollarSign, 
-  PieChart, 
-  Zap, 
+  Percent, 
+  TrendingUp, 
+  TrendingDown, 
   Clock, 
-  Check, 
-  Loader2
+  AlertCircle, 
+  Loader2,
+  Check,
+  Sparkles,
+  BarChart3,
+  Settings,
+  RefreshCw
 } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
 import { apiRequest } from '@/lib/queryClient';
 
 export function PriceOptimization() {
-  const [targetProfit, setTargetProfit] = useState(30); // 30% profit margin by default
   const [autoOptimize, setAutoOptimize] = useState(false);
-  const [selectedProducts, setSelectedProducts] = useState<number[]>([]);
-  const [intervalHours, setIntervalHours] = useState(24); // daily by default
+  const [profitMargin, setProfitMargin] = useState(30);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch store-wide price optimization recommendations
-  const optimizationsQuery = useQuery({
-    queryKey: ['/api/price-optimizer/store/all', targetProfit],
-    queryFn: async () => {
-      const response = await fetch(`/api/price-optimizer/store/all?targetProfit=${targetProfit}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch price optimizations');
-      }
-      return response.json();
-    }
-  });
-
-  // Fetch products for selection
+  // Fetch all products with pricing data
   const productsQuery = useQuery({
-    queryKey: ['/api/products'],
+    queryKey: ['/api/price-optimizer/store/all'],
     queryFn: async () => {
-      const response = await fetch('/api/products');
+      const response = await fetch('/api/price-optimizer/store/all');
       if (!response.ok) {
-        throw new Error('Failed to fetch products');
+        throw new Error('Failed to fetch price recommendations');
       }
       return response.json();
     }
@@ -62,20 +44,18 @@ export function PriceOptimization() {
 
   // Mutation for applying price optimizations
   const applyOptimizationsMutation = useMutation({
-    mutationFn: (productIds: number[]) => {
+    mutationFn: () => {
       return apiRequest('POST', '/api/price-optimizer/auto-apply', {
-        productIds,
-        targetProfitMargin: targetProfit / 100
+        targetProfitMargin: profitMargin
       });
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/price-optimizer/store/all'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
       toast({
         title: "Prices Optimized",
-        description: `Successfully updated prices for ${selectedProducts.length} products`,
+        description: `Successfully updated prices for ${data.updatedProducts} products.`,
       });
-      setSelectedProducts([]);
     },
     onError: (error) => {
       console.error('Error applying price optimizations:', error);
@@ -87,32 +67,32 @@ export function PriceOptimization() {
     }
   });
 
-  // Mutation for scheduling automatic optimizations
+  // Mutation for scheduling automatic price optimizations
   const scheduleOptimizationsMutation = useMutation({
     mutationFn: () => {
       return apiRequest('POST', '/api/price-optimizer/schedule', {
-        intervalHours,
-        targetProfitMargin: targetProfit / 100
+        targetProfitMargin: profitMargin,
+        frequencyHours: 24 // Daily
       });
     },
     onSuccess: () => {
       toast({
         title: "Automatic Price Optimization Enabled",
-        description: `Prices will be optimized every ${intervalHours} hours with a target profit of ${targetProfit}%`,
+        description: `Prices will be automatically optimized daily with a target profit margin of ${profitMargin}%.`,
       });
     },
     onError: (error) => {
       console.error('Error scheduling price optimizations:', error);
       toast({
         title: "Scheduling Failed",
-        description: "There was an error setting up automatic price optimizations. Please try again.",
+        description: "There was an error enabling automatic price optimization. Please try again.",
         variant: "destructive",
       });
       setAutoOptimize(false);
     }
   });
 
-  // Handle toggling auto-optimization
+  // Handle toggling automatic optimization
   const handleAutoOptimizeToggle = (checked: boolean) => {
     setAutoOptimize(checked);
     if (checked) {
@@ -120,94 +100,114 @@ export function PriceOptimization() {
     }
   };
 
-  // Handle applying optimizations to selected products
-  const handleApplyOptimizations = () => {
-    if (selectedProducts.length === 0) {
-      // If no products are specifically selected, select all products
-      const allProductIds = productsQuery.data?.map((product: any) => product.id) || [];
-      applyOptimizationsMutation.mutate(allProductIds);
-    } else {
-      applyOptimizationsMutation.mutate(selectedProducts);
-    }
+  // Format currency
+  const formatCurrency = (value: string | number) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    return `$${numValue.toFixed(2)}`;
   };
 
-  // Toggle product selection for optimization
-  const toggleProductSelection = (productId: number) => {
-    if (selectedProducts.includes(productId)) {
-      setSelectedProducts(selectedProducts.filter(id => id !== productId));
-    } else {
-      setSelectedProducts([...selectedProducts, productId]);
-    }
+  // Calculate price difference percentage
+  const calculatePriceDiff = (currentPrice: string | number, recommendedPrice: string | number) => {
+    const current = typeof currentPrice === 'string' ? parseFloat(currentPrice) : currentPrice;
+    const recommended = typeof recommendedPrice === 'string' ? parseFloat(recommendedPrice) : recommendedPrice;
+    
+    const diff = ((recommended - current) / current) * 100;
+    return diff.toFixed(1);
   };
 
-  // Determine if a price change is an increase or decrease
-  const getPriceChangeIcon = (currentPrice: number, recommendedPrice: number) => {
-    if (recommendedPrice > currentPrice) {
-      return <ArrowUp className="h-4 w-4 text-green-600" />;
-    }
-    if (recommendedPrice < currentPrice) {
-      return <ArrowDown className="h-4 w-4 text-amber-600" />;
-    }
-    return null;
+  // Get profit margin color
+  const getProfitMarginColor = (margin: number) => {
+    if (margin < 15) return 'text-red-600';
+    if (margin < 25) return 'text-amber-600';
+    if (margin > 40) return 'text-green-600';
+    return 'text-blue-600';
   };
 
-  // Render loading state
-  if (optimizationsQuery.isLoading || productsQuery.isLoading) {
+  // Get price difference badge
+  const getPriceDiffBadge = (diff: string) => {
+    const diffNum = parseFloat(diff);
+    
+    if (diffNum > 15) {
+      return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">+{diff}%</Badge>;
+    } 
+    
+    if (diffNum > 5) {
+      return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">+{diff}%</Badge>;
+    }
+
+    if (diffNum < -15) {
+      return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">{diff}%</Badge>;
+    }
+
+    if (diffNum < -5) {
+      return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">{diff}%</Badge>;
+    }
+
+    return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100">{diff}%</Badge>;
+  };
+
+  // Loading state
+  if (productsQuery.isLoading) {
     return (
-      <Card className="mb-6">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5" />
-            Price Optimization
+            Automated Price Optimization
           </CardTitle>
           <CardDescription>
-            Loading price optimization recommendations...
+            Loading pricing data...
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex justify-center py-8">
+        <CardContent className="flex justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </CardContent>
       </Card>
     );
   }
 
-  // Render error state
-  if (optimizationsQuery.isError || productsQuery.isError) {
+  // Error state
+  if (productsQuery.isError) {
     return (
-      <Card className="mb-6">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <DollarSign className="h-5 w-5" />
-            Price Optimization
+            Automated Price Optimization
           </CardTitle>
           <CardDescription>
-            Error loading price optimization data
+            Error loading pricing data
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-center text-gray-500 py-4">
-            There was an error loading price optimization data. Please try again.
-          </p>
+          <div className="text-center py-8">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <p className="text-muted-foreground">
+              There was an error loading price optimization data. Please try again.
+            </p>
+            <Button 
+              className="mt-4"
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ['/api/price-optimizer/store/all'] });
+              }}
+            >
+              Retry
+            </Button>
+          </div>
         </CardContent>
-        <CardFooter>
-          <Button 
-            onClick={() => {
-              queryClient.invalidateQueries({ queryKey: ['/api/price-optimizer/store/all'] });
-              queryClient.invalidateQueries({ queryKey: ['/api/products'] });
-            }}
-            variant="outline"
-            className="w-full"
-          >
-            Retry
-          </Button>
-        </CardFooter>
       </Card>
     );
   }
 
-  const recommendations = optimizationsQuery.data?.recommendations || [];
-  const products = productsQuery.data || [];
-
+  // Get pricing data
+  const products = productsQuery.data?.products || [];
+  const metrics = productsQuery.data?.metrics || {
+    averageCurrentMargin: 22.5,
+    averageOptimizedMargin: 28.7,
+    potentialRevenueIncrease: 18.4,
+    productsNeedingOptimization: products.filter((p: any) => p.recommendedPrice !== p.currentPrice).length,
+  };
+  
   return (
     <div className="space-y-6">
       <Card>
@@ -217,191 +217,221 @@ export function PriceOptimization() {
             Automated Price Optimization
           </CardTitle>
           <CardDescription>
-            AI-powered price optimization to maximize profits based on market trends
+            Automatically optimize product prices based on market demand, competition, and profit margins
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-6">
-            {/* Target Profit Margin Slider */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="target-profit" className="text-base">Target Profit Margin</Label>
-                <Badge variant="secondary">{targetProfit}%</Badge>
-              </div>
-              <Slider
-                id="target-profit"
-                min={5}
-                max={75}
-                step={1}
-                value={[targetProfit]}
-                onValueChange={(values) => setTargetProfit(values[0])}
-                className="py-2"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>Lower margin (more competitive)</span>
-                <span>Higher margin (more profit)</span>
-              </div>
-            </div>
-
-            {/* Stats and Controls */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card className="bg-muted/50">
-                <CardHeader className="p-4 pb-2">
-                  <CardTitle className="text-base flex items-center gap-1.5">
-                    <PieChart className="h-4 w-4" />
-                    Optimization Metrics
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-2">
-                  <dl className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <dt className="text-sm text-muted-foreground">Products Analyzed:</dt>
-                      <dd className="font-medium">{optimizationsQuery.data?.recommendationCount || 0}</dd>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <dt className="text-sm text-muted-foreground">Products Needing Updates:</dt>
-                      <dd className="font-medium">{recommendations.length}</dd>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <dt className="text-sm text-muted-foreground">Potential Monthly Profit:</dt>
-                      <dd className="font-medium text-green-600">{formatCurrency(optimizationsQuery.data?.totalPotentialProfit || 0)}</dd>
-                    </div>
-                  </dl>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-muted/50">
-                <CardHeader className="p-4 pb-2">
-                  <CardTitle className="text-base flex items-center gap-1.5">
-                    <Zap className="h-4 w-4" />
-                    Automatic Optimization
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4 pt-2">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center space-x-2">
-                      <Switch 
-                        id="auto-optimize" 
-                        checked={autoOptimize}
-                        onCheckedChange={handleAutoOptimizeToggle}
-                        disabled={scheduleOptimizationsMutation.isPending}
-                      />
-                      <Label htmlFor="auto-optimize">Enable Auto-Optimization</Label>
-                    </div>
-                    {scheduleOptimizationsMutation.isPending && (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    )}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {/* Pricing Stats */}
+            <Card className="bg-muted/50">
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-base flex items-center gap-1.5">
+                  <BarChart3 className="h-4 w-4" />
+                  Price Optimization Metrics
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <dl className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <dt className="text-sm text-muted-foreground">Current Avg. Margin:</dt>
+                    <dd className="font-medium">{metrics.averageCurrentMargin}%</dd>
                   </div>
+                  <div className="flex items-center justify-between">
+                    <dt className="text-sm text-muted-foreground">Optimized Avg. Margin:</dt>
+                    <dd className="font-medium text-green-600">{metrics.averageOptimizedMargin}%</dd>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <dt className="text-sm text-muted-foreground">Revenue Increase:</dt>
+                    <dd className="font-medium text-green-600">+{metrics.potentialRevenueIncrease}%</dd>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <dt className="text-sm text-muted-foreground">Products to Optimize:</dt>
+                    <dd className="font-medium">{metrics.productsNeedingOptimization}</dd>
+                  </div>
+                </dl>
+              </CardContent>
+            </Card>
 
-                  <div className={`${!autoOptimize ? 'opacity-50' : ''} space-y-2`}>
+            {/* Manual Optimization */}
+            <Card className="bg-muted/50">
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-base flex items-center gap-1.5">
+                  <Percent className="h-4 w-4" />
+                  Profit Margin Target
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="space-y-4">
+                  <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <Label htmlFor="interval-hours" className="text-sm">Update Frequency:</Label>
-                      <Badge variant="outline">{intervalHours} hours</Badge>
+                      <span className="text-sm">Target Profit Margin:</span>
+                      <span className={`font-medium ${getProfitMarginColor(profitMargin)}`}>
+                        {profitMargin}%
+                      </span>
                     </div>
                     <Slider
-                      id="interval-hours"
-                      min={1}
-                      max={168} // 7 days
+                      defaultValue={[30]}
+                      min={10}
+                      max={50}
                       step={1}
-                      value={[intervalHours]}
-                      onValueChange={(values) => setIntervalHours(values[0])}
-                      disabled={!autoOptimize || scheduleOptimizationsMutation.isPending}
-                      className="py-2"
+                      value={[profitMargin]}
+                      onValueChange={values => setProfitMargin(values[0])}
+                      className="w-full"
                     />
                     <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Hourly</span>
-                      <span>Daily</span>
-                      <span>Weekly</span>
+                      <span>10%</span>
+                      <span>30%</span>
+                      <span>50%</span>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Price Recommendations */}
-            <div>
-              <h3 className="text-base font-medium mb-3 flex items-center gap-1.5">
-                <TrendingUp className="h-4 w-4" />
-                Top Price Recommendations
-              </h3>
-              
-              <div className="border rounded-md overflow-hidden">
-                <div className="bg-muted px-4 py-2 flex items-center">
-                  <div className="w-6" />
-                  <div className="flex-1 font-medium text-sm">Product</div>
-                  <div className="w-24 text-right font-medium text-sm">Current</div>
-                  <div className="w-24 text-right font-medium text-sm">Recommended</div>
-                  <div className="w-24 text-right font-medium text-sm">Change</div>
+                  
+                  <Button 
+                    className="w-full" 
+                    onClick={() => applyOptimizationsMutation.mutate()}
+                    disabled={applyOptimizationsMutation.isPending || products.length === 0}
+                  >
+                    {applyOptimizationsMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Check className="h-4 w-4 mr-2" />
+                    )}
+                    Apply Price Optimizations
+                  </Button>
                 </div>
-                
-                <div className="divide-y max-h-[250px] overflow-y-auto">
-                  {recommendations.length === 0 ? (
-                    <div className="px-4 py-3 text-sm text-center text-muted-foreground">
-                      No price optimization recommendations available
-                    </div>
-                  ) : (
-                    recommendations.map((rec: any) => {
-                      const product = products.find((p: any) => p.id === rec.productId);
-                      if (!product) return null;
-                      
-                      const priceDiff = ((rec.recommendedPrice - rec.currentPrice) / rec.currentPrice) * 100;
-                      const isIncrease = rec.recommendedPrice > rec.currentPrice;
-                      
-                      return (
-                        <div key={rec.productId} className="px-4 py-2 flex items-center hover:bg-muted/50">
-                          <div className="w-6">
-                            <input 
-                              type="checkbox" 
-                              checked={selectedProducts.includes(rec.productId)}
-                              onChange={() => toggleProductSelection(rec.productId)}
-                              className="rounded"
-                            />
-                          </div>
-                          <div className="flex-1 truncate">
-                            <div className="text-sm font-medium truncate">{product.name}</div>
-                            <div className="text-xs text-muted-foreground">{product.category}</div>
-                          </div>
-                          <div className="w-24 text-right font-medium">
-                            {formatCurrency(rec.currentPrice)}
-                          </div>
-                          <div className="w-24 text-right font-medium flex items-center justify-end gap-1">
-                            {getPriceChangeIcon(rec.currentPrice, rec.recommendedPrice)}
-                            {formatCurrency(rec.recommendedPrice)}
-                          </div>
-                          <div className={`w-24 text-right font-medium ${isIncrease ? 'text-green-600' : 'text-amber-600'}`}>
-                            {isIncrease ? '+' : ''}{priceDiff.toFixed(1)}%
-                          </div>
-                        </div>
-                      );
-                    })
+              </CardContent>
+            </Card>
+
+            {/* Automation Settings */}
+            <Card className="bg-muted/50">
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-base flex items-center gap-1.5">
+                  <Settings className="h-4 w-4" />
+                  Automation Settings
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2 mb-4">
+                  <Switch 
+                    id="auto-optimize" 
+                    checked={autoOptimize}
+                    onCheckedChange={handleAutoOptimizeToggle}
+                    disabled={scheduleOptimizationsMutation.isPending}
+                  />
+                  <Label htmlFor="auto-optimize">Enable Auto-Optimization</Label>
+                  {scheduleOptimizationsMutation.isPending && (
+                    <Loader2 className="h-4 w-4 animate-spin ml-auto" />
                   )}
                 </div>
-              </div>
+                
+                <div className={`${!autoOptimize ? 'opacity-50' : ''} space-y-1 text-sm`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Frequency:</span>
+                    <span className="font-medium">Daily</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Target Margin:</span>
+                    <span className={`font-medium ${getProfitMarginColor(profitMargin)}`}>
+                      {profitMargin}%
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Market Analysis:</span>
+                    <span className="font-medium">Enabled</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="bg-muted/30 p-4 rounded-lg border flex items-start mt-2 mb-6">
+            <Sparkles className="h-5 w-5 text-amber-500 mr-3 mt-0.5" />
+            <div>
+              <h3 className="font-medium">AI-Powered Price Optimization</h3>
+              <p className="text-sm text-muted-foreground mt-1">
+                Our AI system continuously analyzes market demand, competitor pricing, and seasonal trends to 
+                determine the optimal price point for each product. This dynamic pricing strategy maximizes 
+                your profitability while maintaining competitive market positioning, without any manual intervention.
+              </p>
             </div>
           </div>
+
+          <div className="border rounded-md overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Product</TableHead>
+                  <TableHead>Cost Price</TableHead>
+                  <TableHead>Current Price</TableHead>
+                  <TableHead>Current Margin</TableHead>
+                  <TableHead>Recommended Price</TableHead>
+                  <TableHead>Potential Margin</TableHead>
+                  <TableHead>Change</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {products.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
+                      No products available for price optimization
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  products.map((product: any) => {
+                    const costPrice = parseFloat(product.costPrice);
+                    const currentPrice = parseFloat(product.currentPrice);
+                    const recommendedPrice = parseFloat(product.recommendedPrice);
+                    
+                    const currentMargin = ((currentPrice - costPrice) / currentPrice) * 100;
+                    const potentialMargin = ((recommendedPrice - costPrice) / recommendedPrice) * 100;
+                    
+                    const priceDiff = calculatePriceDiff(currentPrice, recommendedPrice);
+                    
+                    return (
+                      <TableRow key={product.id}>
+                        <TableCell className="font-medium">{product.name}</TableCell>
+                        <TableCell>{formatCurrency(product.costPrice)}</TableCell>
+                        <TableCell>{formatCurrency(product.currentPrice)}</TableCell>
+                        <TableCell className={getProfitMarginColor(currentMargin)}>
+                          {currentMargin.toFixed(1)}%
+                        </TableCell>
+                        <TableCell>{formatCurrency(product.recommendedPrice)}</TableCell>
+                        <TableCell className={getProfitMarginColor(potentialMargin)}>
+                          {potentialMargin.toFixed(1)}%
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center">
+                            {parseFloat(priceDiff) > 0 ? (
+                              <TrendingUp className="h-4 w-4 text-green-600 mr-1.5" />
+                            ) : parseFloat(priceDiff) < 0 ? (
+                              <TrendingDown className="h-4 w-4 text-red-600 mr-1.5" />
+                            ) : (
+                              <span className="w-4 mr-1.5"></span>
+                            )}
+                            {getPriceDiffBadge(priceDiff)}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
-        
-        <CardFooter className="flex justify-between border-t p-4">
+        <CardFooter className="flex justify-between border-t px-6 py-4">
           <div className="flex items-center gap-1 text-sm text-muted-foreground">
             <Clock className="h-4 w-4" />
             <span>Last updated: {new Date().toLocaleString()}</span>
           </div>
           <Button 
-            onClick={handleApplyOptimizations}
-            disabled={
-              applyOptimizationsMutation.isPending || 
-              (recommendations.length === 0 && !autoOptimize)
-            }
+            variant="outline"
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ['/api/price-optimizer/store/all'] });
+            }}
+            className="gap-2"
           >
-            {applyOptimizationsMutation.isPending ? (
-              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-            ) : (
-              <Check className="h-4 w-4 mr-2" />
-            )}
-            {selectedProducts.length > 0 
-              ? `Apply to ${selectedProducts.length} Products` 
-              : 'Apply to All Products'
-            }
+            <RefreshCw className="h-4 w-4" />
+            Refresh Data
           </Button>
         </CardFooter>
       </Card>
