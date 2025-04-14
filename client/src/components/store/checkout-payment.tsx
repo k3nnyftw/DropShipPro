@@ -49,13 +49,16 @@ export function CheckoutPayment({ amount, orderId, onPaymentComplete }: Checkout
         
         // Create a payment intent
         const response = await apiRequest('POST', '/api/payments/create-payment-intent', {
-          amount: amountInCents,
+          amount: amountInCents, // Send to API in cents
           currency: 'usd',
           orderId: orderId,
         });
         
-        if (response.clientSecret) {
-          setClientSecret(response.clientSecret);
+        // TypeScript fix: Cast response to the expected type
+        const data = response as { clientSecret: string; paymentIntentId: string };
+        
+        if (data.clientSecret) {
+          setClientSecret(data.clientSecret);
         } else {
           throw new Error('No client secret returned');
         }
