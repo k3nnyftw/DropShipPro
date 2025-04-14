@@ -23,7 +23,6 @@ import {
   Twitter, 
   Youtube, 
   Linkedin, 
-  Pinterest, 
   Loader2,
   PlusCircle,
   CheckCircle,
@@ -31,8 +30,8 @@ import {
   AlertCircle,
   RefreshCw
 } from 'lucide-react';
+import { SiPinterest, SiTiktok } from 'react-icons/si';
 import { FaCheckCircle } from 'react-icons/fa';
-import { SiTiktok } from 'react-icons/si';
 
 interface SocialAccount {
   id: number;
@@ -189,7 +188,7 @@ export default function SocialConnect() {
       case 'linkedin':
         return <Linkedin className={className} />;
       case 'pinterest':
-        return <Pinterest className={className} />;
+        return <SiPinterest className={className} />;
       case 'tiktok':
         return <SiTiktok className={className} />;
       default:
