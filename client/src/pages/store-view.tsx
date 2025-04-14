@@ -1,12 +1,46 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
 import StoreHeader from "@/components/store/store-header";
 import StoreBanner from "@/components/store/store-banner";
 import ProductCard from "@/components/store/product-card";
+import { StoreThemeEditor, ThemeOptions } from "@/components/store/theme-editor";
 import { useQuery } from "@tanstack/react-query";
+import { Eye, Palette, ExternalLink } from "lucide-react";
 
 const StoreView: React.FC = () => {
+  const [themeEditorOpen, setThemeEditorOpen] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState<ThemeOptions>({
+    colors: {
+      primary: '#3b82f6',
+      secondary: '#6366f1',
+      accent: '#f43f5e',
+      background: '#ffffff',
+      text: '#374151',
+    },
+    typography: {
+      headingFont: 'Inter',
+      bodyFont: 'Inter',
+      baseSize: 16,
+    },
+    layout: {
+      contentWidth: 1200,
+      spacing: 16,
+      borderRadius: 8,
+    },
+    header: {
+      style: 'modern',
+      showSearch: true,
+    },
+    footer: {
+      columns: 3,
+      showSocial: true,
+    },
+  });
+  
+  const { toast } = useToast();
+  
   const { data: products } = useQuery({
     queryKey: ['/api/products/featured'],
     initialData: [
@@ -53,6 +87,24 @@ const StoreView: React.FC = () => {
     ]
   });
 
+  const handleThemeSave = (theme: ThemeOptions) => {
+    setCurrentTheme(theme);
+    // In a real app, we would save this to the backend
+    toast({
+      title: "Theme updated",
+      description: "Your store theme has been successfully updated."
+    });
+  };
+  
+  const openStorePreview = () => {
+    // Open a new tab with the store preview
+    window.open("/store-preview", "_blank");
+    toast({
+      title: "Store preview opened",
+      description: "Your store has been opened in a new tab."
+    });
+  };
+
   return (
     <>
       <div className="mb-6 flex justify-between items-center">
@@ -61,24 +113,55 @@ const StoreView: React.FC = () => {
           <p className="text-gray-600">Preview and manage how customers see your store</p>
         </div>
         <div className="flex space-x-3">
-          <Button variant="outline" size="default">
+          <Button 
+            variant="outline" 
+            size="default"
+            onClick={() => setThemeEditorOpen(true)}
+          >
+            <Palette className="mr-2 h-4 w-4" />
             Edit Theme
           </Button>
-          <Button>
+          <Button onClick={openStorePreview}>
+            <ExternalLink className="mr-2 h-4 w-4" />
             Visit Store
           </Button>
         </div>
       </div>
 
       {/* Store Preview */}
-      <Card className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <Card 
+        className="bg-white rounded-lg shadow-sm overflow-hidden"
+        style={{
+          backgroundColor: currentTheme.colors.background,
+          borderRadius: `${currentTheme.layout.borderRadius}px`
+        }}
+      >
         <StoreHeader />
         <StoreBanner />
 
         {/* Featured Products */}
-        <div className="container mx-auto py-8 px-4">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6 font-display">Featured Products</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+        <div 
+          className="container mx-auto py-8 px-4"
+          style={{
+            maxWidth: `${currentTheme.layout.contentWidth}px`,
+            padding: `${currentTheme.layout.spacing}px`,
+          }}
+        >
+          <h2 
+            className="text-2xl font-bold mb-6"
+            style={{
+              color: currentTheme.colors.text,
+              fontFamily: currentTheme.typography.headingFont
+            }}
+          >
+            Featured Products
+          </h2>
+          <div 
+            className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
+            style={{
+              gap: `${currentTheme.layout.spacing}px`
+            }}
+          >
             {products.map(product => (
               <ProductCard 
                 key={product.id}
@@ -87,12 +170,27 @@ const StoreView: React.FC = () => {
             ))}
           </div>
           <div className="text-center mt-8">
-            <Button variant="outline">
+            <Button 
+              variant="outline"
+              style={{
+                borderColor: currentTheme.colors.primary,
+                color: currentTheme.colors.primary
+              }}
+            >
+              <Eye className="mr-2 h-4 w-4" />
               View All Products
             </Button>
           </div>
         </div>
       </Card>
+
+      {/* Theme Editor Modal */}
+      <StoreThemeEditor
+        open={themeEditorOpen}
+        onOpenChange={setThemeEditorOpen}
+        initialTheme={currentTheme}
+        onSave={handleThemeSave}
+      />
     </>
   );
 };
