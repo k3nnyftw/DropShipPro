@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Dialog, 
   DialogContent, 
@@ -15,6 +15,7 @@ import { Separator } from '@/components/ui/separator';
 import { Slider } from '@/components/ui/slider';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { useToast } from '@/hooks/use-toast';
+import { useTheme } from '@/contexts/ThemeContext';
 import { 
   Palette, 
   Type, 
@@ -94,11 +95,21 @@ export function StoreThemeEditor({
   onSave,
 }: StoreThemeEditorProps) {
   const { toast } = useToast();
+  const { theme: contextTheme } = useTheme();
   const [theme, setTheme] = useState<ThemeOptions>({
     ...defaultTheme,
-    ...initialTheme,
+    ...contextTheme,
   });
   const [activeTab, setActiveTab] = useState('colors');
+
+  // Update local theme state when initialTheme or contextTheme changes
+  useEffect(() => {
+    setTheme({
+      ...defaultTheme,
+      ...contextTheme,
+      ...initialTheme,
+    });
+  }, [open, initialTheme, contextTheme]);
 
   const handleReset = () => {
     setTheme(defaultTheme);
@@ -110,6 +121,7 @@ export function StoreThemeEditor({
 
   const handleSave = () => {
     onSave(theme);
+    console.log('Saving theme:', theme);
     toast({
       title: 'Theme saved',
       description: 'Your theme changes have been applied to your store',
@@ -520,9 +532,17 @@ export function StoreThemeEditor({
             <Button variant="outline" onClick={() => onOpenChange(false)} className="mr-2" type="button">
               Cancel
             </Button>
-            <Button onClick={handleSave} type="button">
+            <Button 
+              onClick={handleSave} 
+              type="button"
+              style={{ 
+                backgroundColor: theme.colors.primary,
+                color: '#ffffff',
+                borderRadius: `${theme.layout.borderRadius}px`
+              }}
+            >
               <Save className="h-4 w-4 mr-2" />
-              Save Theme
+              Apply Theme
             </Button>
           </div>
         </DialogFooter>
