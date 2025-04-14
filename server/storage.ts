@@ -3,7 +3,8 @@ import {
   products, type Product, type InsertProduct,
   suppliers, type Supplier, type InsertSupplier,
   orders, type Order, type InsertOrder,
-  campaigns, type Campaign, type InsertCampaign
+  campaigns, type Campaign, type InsertCampaign,
+  payments, type Payment, type InsertPayment
 } from "@shared/schema";
 import { generateOrderNumber } from "@/lib/utils";
 
@@ -42,6 +43,11 @@ export interface IStorage {
   getAllCampaigns(): Promise<Campaign[]>;
   getActiveCampaigns(): Promise<any[]>;
   createCampaign(campaign: InsertCampaign): Promise<Campaign>;
+  
+  // Payment methods
+  getPayment(id: number): Promise<Payment | undefined>;
+  getPaymentsByOrderId(orderId: number): Promise<Payment[]>;
+  createPayment(payment: InsertPayment): Promise<Payment>;
 }
 
 export class MemStorage implements IStorage {
