@@ -218,6 +218,317 @@ const ProductDetailDialog: React.FC<ProductDetailDialogProps> = ({
     onClose();
   };
 
+  const renderContent = () => {
+    if (showCheckout) {
+      return (
+        <div className="py-4">
+          {paymentCompleted ? (
+            <div className="text-center py-8">
+              <div className="bg-green-100 text-green-800 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Payment Successful!</h3>
+              <p className="text-gray-600 mb-6">
+                Thank you for your purchase. Your order has been processed successfully.
+              </p>
+              <Button onClick={handleResetCheckout}>Continue Shopping</Button>
+            </div>
+          ) : (
+            <CheckoutPayment 
+              amount={product.price * 100} // Convert to cents for Stripe
+              orderId={product.id}
+              onPaymentComplete={handlePaymentComplete}
+            />
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid grid-cols-2">
+          <TabsTrigger value="details">Product Details</TabsTrigger>
+          <TabsTrigger value="inventory">Inventory & Pricing</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="details" className="space-y-4 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              {isEditing ? (
+                <>
+                  <div className="mb-4">
+                    <Label htmlFor="name">Product Name</Label>
+                    <Input 
+                      id="name" 
+                      name="name" 
+                      value={editedProduct.name} 
+                      onChange={handleInputChange} 
+                    />
+                  </div>
+
+                  <div className="mb-4">
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea 
+                      id="description" 
+                      name="description" 
+                      rows={5} 
+                      value={editedProduct.description} 
+                      onChange={handleInputChange} 
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <Label htmlFor="category">Category</Label>
+                      <Input 
+                        id="category" 
+                        name="category" 
+                        value={editedProduct.category} 
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="rating">Rating (0-5)</Label>
+                      <Input 
+                        id="rating" 
+                        name="rating"
+                        type="number"
+                        min="0"
+                        max="5"
+                        step="0.1"
+                        value={editedProduct.rating} 
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2 mb-4">
+                    <input
+                      type="checkbox"
+                      id="isNew"
+                      name="isNew"
+                      checked={editedProduct.isNew || false}
+                      onChange={handleCheckboxChange}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <Label htmlFor="isNew">Mark as New</Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2 mb-4">
+                    <input
+                      type="checkbox"
+                      id="isOnSale"
+                      name="isOnSale"
+                      checked={editedProduct.isOnSale || false}
+                      onChange={handleCheckboxChange}
+                      className="h-4 w-4 rounded border-gray-300"
+                    />
+                    <Label htmlFor="isOnSale">On Sale</Label>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-xl font-bold mb-2">{product.name}</h2>
+                  <div className="flex items-center mb-4">
+                    {renderStars(product.rating)}
+                    <span className="ml-2 text-sm text-gray-500">
+                      {product.rating} ({product.reviewCount} reviews)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-4">
+                    {product.isNew && <span className="bg-blue-100 text-blue-800 text-xs px-2.5 py-0.5 rounded">New</span>}
+                    {product.isOnSale && <span className="bg-red-100 text-red-800 text-xs px-2.5 py-0.5 rounded">Sale</span>}
+                    {product.category && <span className="bg-gray-100 text-gray-800 text-xs px-2.5 py-0.5 rounded">{product.category}</span>}
+                  </div>
+                  <p className="text-gray-700 mb-6">{product.description}</p>
+                  
+                  <div className="flex items-baseline mb-4">
+                    <span className="text-2xl font-bold text-gray-900 mr-2">
+                      {formatCurrency(product.price)}
+                    </span>
+                    {product.salePrice && (
+                      <span className="text-gray-500 line-through">
+                        {formatCurrency(product.salePrice)}
+                      </span>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div>
+              <div className="mb-4 rounded-md overflow-hidden aspect-square bg-gray-100">
+                <img 
+                  src={product.imageUrl} 
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              
+              {isEditing && (
+                <div className="mb-4">
+                  <Label htmlFor="imageUrl">Image URL</Label>
+                  <Input 
+                    id="imageUrl" 
+                    name="imageUrl" 
+                    value={editedProduct.imageUrl} 
+                    onChange={handleInputChange} 
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="inventory" className="space-y-4 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              {isEditing ? (
+                <>
+                  <div className="mb-4">
+                    <Label htmlFor="price">Regular Price ($)</Label>
+                    <Input 
+                      id="price" 
+                      name="price" 
+                      type="number" 
+                      step="0.01" 
+                      value={editedProduct.price} 
+                      onChange={handleInputChange} 
+                    />
+                  </div>
+                  <div className="mb-4">
+                    <Label htmlFor="salePrice">Sale Price ($) (Optional)</Label>
+                    <Input 
+                      id="salePrice" 
+                      name="salePrice" 
+                      type="number" 
+                      step="0.01" 
+                      value={editedProduct.salePrice || ''} 
+                      onChange={handleInputChange} 
+                      placeholder="Leave empty for no sale" 
+                    />
+                  </div>
+                  <div className="mb-4">
+                    <Label htmlFor="inventory">Inventory</Label>
+                    <Input 
+                      id="inventory" 
+                      name="inventory" 
+                      type="number" 
+                      value={editedProduct.inventory} 
+                      onChange={handleInputChange} 
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <span className="text-sm text-gray-500 block mb-1">Regular Price</span>
+                      <span className="text-lg font-semibold">{formatCurrency(product.price)}</span>
+                    </div>
+                    {product.salePrice && (
+                      <div className="bg-red-50 p-4 rounded-lg">
+                        <span className="text-sm text-gray-500 block mb-1">Sale Price</span>
+                        <span className="text-lg font-semibold">{formatCurrency(product.salePrice)}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-4 bg-gray-50 p-4 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-500">Inventory</span>
+                      <span className="font-semibold">{product.inventory || 'Not tracked'}</span>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {!isEditing && (
+                <div className="mt-6 bg-blue-50 p-4 rounded-lg">
+                  <h3 className="font-medium mb-2 flex items-center">
+                    <Tag className="h-4 w-4 text-blue-500 mr-2" />
+                    Product Statistics
+                  </h3>
+                  <ul className="text-sm space-y-2">
+                    <li className="flex justify-between">
+                      <span>Page Views</span>
+                      <span className="font-medium">246</span>
+                    </li>
+                    <li className="flex justify-between">
+                      <span>Added to Cart</span>
+                      <span className="font-medium">32</span>
+                    </li>
+                    <li className="flex justify-between">
+                      <span>Conversion Rate</span>
+                      <span className="font-medium">13.0%</span>
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </div>
+            
+            <div>
+              <div className="bg-gray-50 p-5 rounded-lg">
+                <h3 className="font-medium mb-4">Sales Performance</h3>
+                <div className="h-48 flex items-center justify-center">
+                  <p className="text-gray-500 text-center">
+                    Sales chart would appear here
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+    );
+  };
+
+  const renderFooterButtons = () => {
+    if (showCheckout) {
+      return <div />; // Empty div to maintain spacing when in checkout mode
+    }
+
+    return (
+      <>
+        {isEditing ? (
+          <Button
+            variant="destructive"
+            onClick={handleDelete}
+            disabled={deleteProductMutation.isPending}
+          >
+            <Trash className="h-4 w-4 mr-2" />
+            {deleteProductMutation.isPending ? "Deleting..." : "Delete Product"}
+          </Button>
+        ) : (
+          <Button variant="outline" onClick={onClose}>
+            Close
+          </Button>
+        )}
+        
+        {!isEditing && (
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              className="gap-2"
+              onClick={handleAddToCart}
+            >
+              <ShoppingCart className="h-4 w-4" />
+              Add to Cart
+            </Button>
+            <Button 
+              className="gap-2"
+              onClick={handleBuyNow}
+            >
+              <CreditCard className="h-4 w-4" />
+              Buy Now
+            </Button>
+          </div>
+        )}
+      </>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleCloseDialog}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -274,303 +585,10 @@ const ProductDetailDialog: React.FC<ProductDetailDialogProps> = ({
           </DialogTitle>
         </DialogHeader>
 
-        {showCheckout ? (
-          <div className="py-4">
-            {paymentCompleted ? (
-              <div className="text-center py-8">
-                <div className="bg-green-100 text-green-800 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <h3 className="text-xl font-semibold mb-2">Payment Successful!</h3>
-                <p className="text-gray-600 mb-6">
-                  Thank you for your purchase. Your order has been processed successfully.
-                </p>
-                <Button onClick={handleResetCheckout}>Continue Shopping</Button>
-              </div>
-            ) : (
-              <CheckoutPayment 
-                amount={product.price * 100} // Convert to cents for Stripe
-                orderId={product.id}
-                onPaymentComplete={handlePaymentComplete}
-              />
-            )}
-          </div>
-        ) : (
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid grid-cols-2">
-              <TabsTrigger value="details">Product Details</TabsTrigger>
-              <TabsTrigger value="inventory">Inventory & Pricing</TabsTrigger>
-            </TabsList>
-
-          <TabsContent value="details" className="space-y-4 mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                {isEditing ? (
-                  <>
-                    <div className="mb-4">
-                      <Label htmlFor="name">Product Name</Label>
-                      <Input 
-                        id="name" 
-                        name="name" 
-                        value={editedProduct.name} 
-                        onChange={handleInputChange} 
-                      />
-                    </div>
-
-                    <div className="mb-4">
-                      <Label htmlFor="description">Description</Label>
-                      <Textarea 
-                        id="description" 
-                        name="description" 
-                        rows={5} 
-                        value={editedProduct.description} 
-                        onChange={handleInputChange} 
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      <div>
-                        <Label htmlFor="category">Category</Label>
-                        <Input 
-                          id="category" 
-                          name="category" 
-                          value={editedProduct.category} 
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="rating">Rating (0-5)</Label>
-                        <Input 
-                          id="rating" 
-                          name="rating"
-                          type="number"
-                          min="0"
-                          max="5"
-                          step="0.1"
-                          value={editedProduct.rating} 
-                          onChange={handleInputChange}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2 mb-4">
-                      <input
-                        type="checkbox"
-                        id="isNew"
-                        name="isNew"
-                        checked={editedProduct.isNew || false}
-                        onChange={handleCheckboxChange}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                      <Label htmlFor="isNew">Mark as New</Label>
-                    </div>
-                    
-                    <div className="flex items-center space-x-2 mb-4">
-                      <input
-                        type="checkbox"
-                        id="isOnSale"
-                        name="isOnSale"
-                        checked={editedProduct.isOnSale || false}
-                        onChange={handleCheckboxChange}
-                        className="h-4 w-4 rounded border-gray-300"
-                      />
-                      <Label htmlFor="isOnSale">On Sale</Label>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <h2 className="text-xl font-bold mb-2">{product.name}</h2>
-                    <div className="flex items-center mb-4">
-                      {renderStars(product.rating)}
-                      <span className="ml-2 text-sm text-gray-500">
-                        {product.rating} ({product.reviewCount} reviews)
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mb-4">
-                      {product.isNew && <span className="bg-blue-100 text-blue-800 text-xs px-2.5 py-0.5 rounded">New</span>}
-                      {product.isOnSale && <span className="bg-red-100 text-red-800 text-xs px-2.5 py-0.5 rounded">Sale</span>}
-                      {product.category && <span className="bg-gray-100 text-gray-800 text-xs px-2.5 py-0.5 rounded">{product.category}</span>}
-                    </div>
-                    <p className="text-gray-700 mb-6">{product.description}</p>
-                    
-                    <div className="flex items-baseline mb-4">
-                      <span className="text-2xl font-bold text-gray-900 mr-2">
-                        {formatCurrency(product.price)}
-                      </span>
-                      {product.salePrice && (
-                        <span className="text-gray-500 line-through">
-                          {formatCurrency(product.salePrice)}
-                        </span>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              <div>
-                <div className="mb-4 rounded-md overflow-hidden aspect-square bg-gray-100">
-                  <img 
-                    src={product.imageUrl} 
-                    alt={product.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                
-                {isEditing && (
-                  <div className="mb-4">
-                    <Label htmlFor="imageUrl">Image URL</Label>
-                    <Input 
-                      id="imageUrl" 
-                      name="imageUrl" 
-                      value={editedProduct.imageUrl} 
-                      onChange={handleInputChange} 
-                    />
-                  </div>
-                )}
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="inventory" className="space-y-4 mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                {isEditing ? (
-                  <>
-                    <div className="mb-4">
-                      <Label htmlFor="price">Regular Price ($)</Label>
-                      <Input 
-                        id="price" 
-                        name="price" 
-                        type="number" 
-                        step="0.01" 
-                        value={editedProduct.price} 
-                        onChange={handleInputChange} 
-                      />
-                    </div>
-                    <div className="mb-4">
-                      <Label htmlFor="salePrice">Sale Price ($) (Optional)</Label>
-                      <Input 
-                        id="salePrice" 
-                        name="salePrice" 
-                        type="number" 
-                        step="0.01" 
-                        value={editedProduct.salePrice || ''} 
-                        onChange={handleInputChange} 
-                        placeholder="Leave empty for no sale" 
-                      />
-                    </div>
-                    <div className="mb-4">
-                      <Label htmlFor="inventory">Inventory</Label>
-                      <Input 
-                        id="inventory" 
-                        name="inventory" 
-                        type="number" 
-                        value={editedProduct.inventory} 
-                        onChange={handleInputChange} 
-                      />
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <span className="text-sm text-gray-500 block mb-1">Regular Price</span>
-                        <span className="text-lg font-semibold">{formatCurrency(product.price)}</span>
-                      </div>
-                      {product.salePrice && (
-                        <div className="bg-red-50 p-4 rounded-lg">
-                          <span className="text-sm text-gray-500 block mb-1">Sale Price</span>
-                          <span className="text-lg font-semibold">{formatCurrency(product.salePrice)}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="mt-4 bg-gray-50 p-4 rounded-lg">
-                      <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-500">Inventory</span>
-                        <span className="font-semibold">{product.inventory || 'Not tracked'}</span>
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {!isEditing && (
-                  <div className="mt-6 bg-blue-50 p-4 rounded-lg">
-                    <h3 className="font-medium mb-2 flex items-center">
-                      <Tag className="h-4 w-4 text-blue-500 mr-2" />
-                      Product Statistics
-                    </h3>
-                    <ul className="text-sm space-y-2">
-                      <li className="flex justify-between">
-                        <span>Page Views</span>
-                        <span className="font-medium">246</span>
-                      </li>
-                      <li className="flex justify-between">
-                        <span>Added to Cart</span>
-                        <span className="font-medium">32</span>
-                      </li>
-                      <li className="flex justify-between">
-                        <span>Conversion Rate</span>
-                        <span className="font-medium">13.0%</span>
-                      </li>
-                    </ul>
-                  </div>
-                )}
-              </div>
-              
-              <div>
-                <div className="bg-gray-50 p-5 rounded-lg">
-                  <h3 className="font-medium mb-4">Sales Performance</h3>
-                  <div className="h-48 flex items-center justify-center">
-                    <p className="text-gray-500 text-center">
-                      Sales chart would appear here
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </TabsContent>
-        </Tabs>
-        )}
+        {renderContent()}
 
         <DialogFooter className="flex items-center justify-between sm:justify-between mt-6">
-          {showCheckout ? (
-            <div /> // Empty div to maintain spacing when in checkout mode
-          ) : isEditing ? (
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={deleteProductMutation.isPending}
-            >
-              <Trash className="h-4 w-4 mr-2" />
-              {deleteProductMutation.isPending ? "Deleting..." : "Delete Product"}
-            </Button>
-          ) : (
-            <Button variant="outline" onClick={onClose}>
-              Close
-            </Button>
-          )}
-          
-          {!isEditing && !showCheckout && (
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                className="gap-2"
-                onClick={handleAddToCart}
-              >
-                <ShoppingCart className="h-4 w-4" />
-                Add to Cart
-              </Button>
-              <Button 
-                className="gap-2"
-                onClick={handleBuyNow}
-              >
-                <CreditCard className="h-4 w-4" />
-                Buy Now
-              </Button>
-            </div>
-          )}
+          {renderFooterButtons()}
         </DialogFooter>
       </DialogContent>
     </Dialog>
