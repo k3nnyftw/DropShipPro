@@ -241,7 +241,23 @@ export default function EmailAutomation() {
   // Create new campaign mutation
   const createCampaignMutation = useMutation({
     mutationFn: (campaignData: any) => {
-      return apiRequest('POST', '/api/email-marketing/campaigns', campaignData);
+      console.log("Submitting campaign data:", campaignData);
+      // Format the data to match the server-side expectations
+      const formattedData = {
+        ...campaignData,
+        // Ensure status is set
+        status: 'draft',
+        // Add any missing fields with defaults if needed
+        statistics: {
+          sent: 0,
+          opens: 0,
+          clicks: 0,
+          conversions: 0,
+          revenue: 0,
+          unsubscribes: 0
+        }
+      };
+      return apiRequest('POST', '/api/email-marketing/campaigns', formattedData);
     },
     onSuccess: () => {
       toast({
@@ -253,6 +269,7 @@ export default function EmailAutomation() {
       resetCampaignForm();
     },
     onError: (error) => {
+      console.error("Campaign creation error:", error);
       toast({
         title: "Error",
         description: `Failed to create campaign: ${error instanceof Error ? error.message : 'Unknown error'}`,
