@@ -890,9 +890,9 @@ export default function SocialShare() {
                                     </div>
                                     
                                     <div className="mt-3">
-                                      <p className="text-sm line-clamp-2">{post.content.text}</p>
+                                      <p className="text-sm line-clamp-2">{post.content?.text}</p>
                                       
-                                      {post.content.hashtags.length > 0 && (
+                                      {post.content?.hashtags && post.content.hashtags.length > 0 && (
                                         <div className="flex flex-wrap gap-1 mt-2">
                                           {post.content.hashtags.map((tag, idx) => (
                                             <Badge key={idx} variant="secondary" className="text-xs">
@@ -1039,9 +1039,11 @@ export default function SocialShare() {
                             {getPlatformData(platform.platform)?.label || platform.platform}
                           </CardTitle>
                         </div>
-                        <Badge variant="outline" className="text-xs">
-                          {platform.postsCount} posts
-                        </Badge>
+                        <div>
+                          <Badge variant="outline" className="text-xs">
+                            {platform.postsCount} posts
+                          </Badge>
+                        </div>
                       </div>
                     </CardHeader>
                     <CardContent className="pb-3">
@@ -1207,9 +1209,11 @@ export default function SocialShare() {
                                 <div key={index} className="space-y-1">
                                   <div className="flex justify-between items-center">
                                     <h4 className="text-sm font-medium">{timeData.dayOfWeek}</h4>
-                                    <Badge variant="outline" className="text-xs">
-                                      {timeData.engagementRate.toFixed(1)}% engagement
-                                    </Badge>
+                                    <div>
+                                      <Badge variant="outline" className="text-xs">
+                                        {timeData.engagementRate.toFixed(1)}% engagement
+                                      </Badge>
+                                    </div>
                                   </div>
                                   
                                   <div className="flex flex-wrap gap-1">
