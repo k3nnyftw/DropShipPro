@@ -169,8 +169,12 @@ router.post('/webhook', async (req, res) => {
               metadata: {},
             };
             
-            // TODO: Implement createPayment in storage
-            // await storage.createPayment(paymentData);
+            try {
+              await storage.createPayment(paymentData);
+              console.log(`Payment record created for order ${order.orderNumber}`);
+            } catch (paymentError) {
+              console.error('Error creating payment record:', paymentError);
+            }
           }
         }
         break;

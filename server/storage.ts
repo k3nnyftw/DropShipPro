@@ -56,6 +56,7 @@ export class MemStorage implements IStorage {
   private suppliers: Map<number, Supplier>;
   private orders: Map<number, Order>;
   private campaigns: Map<number, Campaign>;
+  private payments: Map<number, Payment>;
   currentId: number;
 
   constructor() {
@@ -64,6 +65,7 @@ export class MemStorage implements IStorage {
     this.suppliers = new Map();
     this.orders = new Map();
     this.campaigns = new Map();
+    this.payments = new Map();
     this.currentId = 1;
     this.initDemoData();
   }
@@ -503,6 +505,35 @@ export class MemStorage implements IStorage {
     const campaign: Campaign = { ...insertCampaign, id, createdAt };
     this.campaigns.set(id, campaign);
     return campaign;
+  }
+
+  // Payment methods
+  async getPayment(id: number): Promise<Payment | undefined> {
+    return this.payments.get(id);
+  }
+
+  async getPaymentsByOrderId(orderId: number): Promise<Payment[]> {
+    return Array.from(this.payments.values())
+      .filter(payment => payment.orderId === orderId);
+  }
+
+  async createPayment(insertPayment: InsertPayment): Promise<Payment> {
+    const id = this.currentId++;
+    const createdAt = new Date();
+    const payment: Payment = { 
+      ...insertPayment, 
+      id, 
+      createdAt,
+      amount: insertPayment.amount || "0",
+      currency: insertPayment.currency || "usd",
+      status: insertPayment.status || "pending",
+      paymentMethod: insertPayment.paymentMethod || "card",
+      stripePaymentId: insertPayment.stripePaymentId || null,
+      stripeCustomerId: insertPayment.stripeCustomerId || null,
+      metadata: insertPayment.metadata || {} 
+    };
+    this.payments.set(id, payment);
+    return payment;
   }
 }
 
