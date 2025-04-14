@@ -39,11 +39,26 @@ type CurrentSubscription = {
   };
 };
 
-export function PlanSelector() {
-  const [open, setOpen] = useState(false);
+type PlanSelectorProps = {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+};
+
+export function PlanSelector({ open: externalOpen, onOpenChange }: PlanSelectorProps = {}) {
+  const [internalOpen, setInternalOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [isUpgrading, setIsUpgrading] = useState(false);
   const { toast } = useToast();
+  
+  // Use external open state if provided, otherwise use internal state
+  const open = externalOpen !== undefined ? externalOpen : internalOpen;
+  const setOpen = (value: boolean) => {
+    if (onOpenChange) {
+      onOpenChange(value);
+    } else {
+      setInternalOpen(value);
+    }
+  };
 
   // Fetch available plans
   const { data: plans, isLoading: plansLoading } = useQuery<SubscriptionPlan[]>({
@@ -60,13 +75,10 @@ export function PlanSelector() {
 
     setIsUpgrading(true);
     try {
-      const response = await apiRequest('/api/subscription/create-checkout-session', {
-        method: 'POST',
-        body: JSON.stringify({
-          plan: selectedPlan,
-          successUrl: `${window.location.origin}/dashboard?subscription=success`,
-          cancelUrl: `${window.location.origin}/dashboard?subscription=cancelled`,
-        }),
+      const response = await apiRequest('/api/subscription/create-checkout-session', 'POST', {
+        plan: selectedPlan,
+        successUrl: `${window.location.origin}/dashboard?subscription=success`,
+        cancelUrl: `${window.location.origin}/dashboard?subscription=cancelled`,
       });
 
       if (response.url) {
@@ -85,9 +97,7 @@ export function PlanSelector() {
 
   const handleCancel = async () => {
     try {
-      await apiRequest('/api/subscription/cancel', {
-        method: 'POST',
-      });
+      await apiRequest('/api/subscription/cancel', 'POST');
       
       toast({
         title: 'Subscription cancelled',

@@ -55,16 +55,18 @@ const QuickActions: React.FC = () => {
       <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {actions.map((action) => (
-          <Link key={action.id} href={action.link}>
-            <a className="bg-white rounded-lg shadow-sm p-6 flex items-center hover:shadow-md transition-shadow">
-              <div className={`p-3 rounded-full ${action.backgroundColor} ${action.iconColor}`}>
-                {action.icon}
-              </div>
-              <div className="ml-4">
-                <h3 className="font-medium">{action.title}</h3>
-                <p className="text-sm text-gray-500">{action.description}</p>
-              </div>
-            </a>
+          <Link 
+            key={action.id} 
+            href={action.link}
+            className="bg-white rounded-lg shadow-sm p-6 flex items-center hover:shadow-md transition-shadow"
+          >
+            <div className={`p-3 rounded-full ${action.backgroundColor} ${action.iconColor}`}>
+              {action.icon}
+            </div>
+            <div className="ml-4">
+              <h3 className="font-medium">{action.title}</h3>
+              <p className="text-sm text-gray-500">{action.description}</p>
+            </div>
           </Link>
         ))}
       </div>
