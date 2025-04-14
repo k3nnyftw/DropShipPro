@@ -11,6 +11,8 @@ import Orders from "@/pages/orders";
 import Automation from "@/pages/automation";
 import CompetitorTrackingPage from "@/pages/competitor-tracking";
 import ProductDescriptionGeneratorPage from "@/pages/product-description-generator";
+import EmailMarketingPage from "@/pages/email-marketing";
+import SocialSharingPage from "@/pages/social-sharing";
 
 function App() {
   return (
@@ -26,6 +28,8 @@ function App() {
           <Route path="/automation" component={Automation} />
           <Route path="/competitor-tracking" component={CompetitorTrackingPage} />
           <Route path="/product-description-generator" component={ProductDescriptionGeneratorPage} />
+          <Route path="/email-marketing" component={EmailMarketingPage} />
+          <Route path="/social-sharing" component={SocialSharingPage} />
           <Route component={NotFound} />
         </Switch>
       </MainLayout>

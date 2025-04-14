@@ -54,6 +54,16 @@ const Header: React.FC = () => {
               Analytics
             </a>
           </Link>
+          <Link href="/email-marketing">
+            <a className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
+              Email
+            </a>
+          </Link>
+          <Link href="/social-sharing">
+            <a className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
+              Social
+            </a>
+          </Link>
         </div>
         
         <div className="flex items-center space-x-4">
