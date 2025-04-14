@@ -81,25 +81,45 @@ export function CheckoutPayment({ amount, orderId, onPaymentComplete }: Checkout
     try {
       setIsProcessing(true);
       
-      // In a real implementation, this is where you would use the Stripe.js
-      // library to collect card details and confirm the payment intent
-      // using the client secret.
+      if (!clientSecret) {
+        throw new Error('No payment intent created. Please try again.');
+      }
       
-      // For this demo, we'll simulate a payment processing delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Simulate a successful payment
-      toast({
-        title: 'Payment Successful',
-        description: `Your payment of ${formatCurrency(amount)} has been processed successfully.`,
-      });
-      
-      onPaymentComplete(true, 'pi_simulated_123456789');
+      // In a production implementation, we would use Stripe.js to confirm the payment
+      // For security reasons, we would load the Stripe.js library and use Elements
+      // This is just a placeholder for the real implementation using Stripe.js
+      try {
+        // Simulating a Stripe confirmation API call
+        const confirmResponse = await apiRequest<{ paymentIntentId: string }>('POST', '/api/payments/confirm-payment', {
+          paymentMethod: {
+            card: {
+              number: values.cardNumber.replace(/\s/g, ''),
+              exp_month: parseInt(values.expiryDate.split('/')[0]),
+              exp_year: parseInt('20' + values.expiryDate.split('/')[1]),
+              cvc: values.cvv
+            },
+            billing_details: {
+              name: values.cardHolder
+            }
+          },
+          clientSecret
+        });
+        
+        toast({
+          title: 'Payment Successful',
+          description: `Your payment of ${formatCurrency(amount)} has been processed successfully.`,
+        });
+        
+        onPaymentComplete(true, confirmResponse.paymentIntentId);
+      } catch (confirmError) {
+        console.error('Payment confirmation error:', confirmError);
+        throw new Error('Payment confirmation failed');
+      }
     } catch (error) {
       console.error('Payment error:', error);
       toast({
         title: 'Payment Failed',
-        description: 'There was an error processing your payment. Please try again.',
+        description: error instanceof Error ? error.message : 'There was an error processing your payment. Please try again.',
         variant: 'destructive',
       });
       onPaymentComplete(false);
