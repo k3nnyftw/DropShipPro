@@ -4,10 +4,12 @@ import { storage } from "./storage";
 import { insertProductSchema, insertSupplierSchema, insertOrderSchema, insertCampaignSchema } from "../shared/schema";
 import { z } from "zod";
 import paymentRoutes from "./routes/payment";
+import aiAnalyticsRoutes from "./routes/ai-analytics";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Register payment routes
+  // Register route modules
   app.use('/api/payments', paymentRoutes);
+  app.use('/api/ai-analytics', aiAnalyticsRoutes);
   
   // prefix all routes with /api
   

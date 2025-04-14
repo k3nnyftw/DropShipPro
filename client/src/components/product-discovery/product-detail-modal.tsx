@@ -1,367 +1,193 @@
-import React, { useState } from "react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Star, DollarSign, Package, TrendingUp, ShoppingCart } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
-
-interface TrendingProduct {
-  id: number;
-  name: string;
-  searchVolume: string;
-  category: string;
-  trendScore: number;
-  profitMargin: string;
-  competition: string;
-  imageUrl: string;
-  description?: string;
-}
+import React from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Sparkles, LineChart, BarChart3, Percent, ChevronRight, TrendingUp, Clock, Users, DollarSign } from 'lucide-react';
 
 interface ProductDetailModalProps {
-  product: TrendingProduct | null;
+  product: any;
   open: boolean;
   onClose: () => void;
   onAddToStore: (product: any) => void;
 }
 
-const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
-  product,
-  open,
-  onClose,
-  onAddToStore
-}) => {
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
-  
-  const [activeTab, setActiveTab] = useState("details");
-  const [editedProduct, setEditedProduct] = useState<any>({
-    name: "",
-    description: "High-quality product with great features and benefits for customers.",
-    price: "0.00",
-    costPrice: "0.00",
-    salePrice: "",
-    category: "",
-    imageUrl: "",
-    inventory: 100,
-    trending: true,
-    rating: "5.0",
-    reviewCount: 0
-  });
-
-  // Initialize the form when the modal opens with a product
-  React.useEffect(() => {
-    if (product) {
-      // Extract profit margin range and use the higher value for price calculation
-      const profitMarginRange = product.profitMargin.replace('%', '').split('-');
-      const highestProfitMargin = parseInt(profitMarginRange[profitMarginRange.length - 1]) / 100;
-      
-      // Estimate a cost price based on the category and trend score
-      const baseCostPrice = product.category === "Electronics" ? 25 : 15;
-      const costPrice = (baseCostPrice + (product.trendScore * 0.5)).toFixed(2);
-      
-      // Calculate selling price based on the profit margin
-      const sellingPrice = (parseFloat(costPrice) * (1 + highestProfitMargin)).toFixed(2);
-      
-      setEditedProduct({
-        name: product.name,
-        description: product.description || "High-quality product with great features and benefits for customers.",
-        price: sellingPrice,
-        costPrice: costPrice,
-        salePrice: "",
-        category: product.category,
-        imageUrl: product.imageUrl,
-        inventory: 100,
-        trending: true,
-        rating: (product.trendScore / 2).toFixed(1),
-        reviewCount: 0
-      });
-    }
-  }, [product]);
-
-  const addToStoreMutation = useMutation({
-    mutationFn: (productData: any) => {
-      return apiRequest('POST', '/api/products', productData);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/products/top'] });
-      toast({
-        title: "Product added to store",
-        description: `${editedProduct.name} has been added to your store successfully.`,
-      });
-      onClose();
-    },
-    onError: (error) => {
-      console.error("Error adding product:", error);
-      toast({
-        title: "Error adding product",
-        description: "There was an error adding the product to your store. Please try again.",
-        variant: "destructive"
-      });
-    }
-  });
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setEditedProduct({ ...editedProduct, [name]: value });
-  };
-
-  const handleSelectChange = (name: string, value: string) => {
-    setEditedProduct({ ...editedProduct, [name]: value });
-  };
-
-  const handleAddToStore = () => {
-    addToStoreMutation.mutate(editedProduct);
-    onAddToStore(editedProduct);
-  };
-
+export default function ProductDetailModal({ product, open, onClose, onAddToStore }: ProductDetailModalProps) {
   if (!product) return null;
 
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return 'text-green-600';
+    if (score >= 60) return 'text-amber-600';
+    return 'text-gray-600';
+  };
+
+  const getCompetitionLevel = (level: number) => {
+    if (level <= 3) return { text: 'Low', color: 'text-green-600' };
+    if (level <= 7) return { text: 'Medium', color: 'text-amber-600' };
+    return { text: 'High', color: 'text-red-600' };
+  };
+
+  const getProfitAssessment = (profit: number) => {
+    if (profit >= 30) return { text: 'High Margin', color: 'text-green-600' };
+    if (profit >= 15) return { text: 'Moderate Margin', color: 'text-amber-600' };
+    return { text: 'Low Margin', color: 'text-gray-600' };
+  };
+
+  const competition = getCompetitionLevel(product.competitionLevel);
+  const profit = getProfitAssessment(product.profitPotential);
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+    <Dialog open={open} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl">Product Details</DialogTitle>
-          <DialogDescription>
-            View and edit product details before adding to your store
+          <DialogTitle className="text-xl">{product.name}</DialogTitle>
+          <DialogDescription className="flex items-center gap-2 mt-1">
+            <span>{product.category}</span>
+            <Badge variant="outline" className="ml-2">{`Growth: ${product.growthRate}%`}</Badge>
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-2">
-            <TabsTrigger value="details">Product Details</TabsTrigger>
-            <TabsTrigger value="pricing">Pricing & Inventory</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="details" className="space-y-4 mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="mt-4 p-4 bg-muted/30 rounded-lg border">
+          <div className="flex items-center mb-4">
+            <Sparkles className="h-5 w-5 text-amber-500 mr-2" />
+            <h3 className="font-semibold text-lg">AI Analysis Score</h3>
+            <span className={`ml-auto font-bold text-xl ${getScoreColor(product.recommendationScore)}`}>
+              {product.recommendationScore}/100
+            </span>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-6">
+            <div className="space-y-4">
               <div>
-                <div className="mb-4">
-                  <Label htmlFor="name">Product Name</Label>
-                  <Input 
-                    id="name" 
-                    name="name" 
-                    value={editedProduct.name} 
-                    onChange={handleInputChange} 
-                  />
-                </div>
-
-                <div className="mb-4">
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea 
-                    id="description" 
-                    name="description" 
-                    rows={5} 
-                    value={editedProduct.description} 
-                    onChange={handleInputChange} 
-                  />
-                </div>
-
-                <div className="mb-4">
-                  <Label htmlFor="category">Category</Label>
-                  <Select 
-                    value={editedProduct.category} 
-                    onValueChange={(value) => handleSelectChange("category", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Electronics">Electronics</SelectItem>
-                      <SelectItem value="Fashion">Fashion</SelectItem>
-                      <SelectItem value="Home Decor">Home Decor</SelectItem>
-                      <SelectItem value="Office">Office</SelectItem>
-                      <SelectItem value="Health & Beauty">Health & Beauty</SelectItem>
-                    </SelectContent>
-                  </Select>
+                <h4 className="text-sm font-medium text-muted-foreground flex items-center">
+                  <TrendingUp className="h-4 w-4 mr-1.5" />
+                  Market Trend
+                </h4>
+                <div className="mt-1 flex items-center">
+                  <span className="text-lg font-medium">{product.growthRate}% Growth</span>
+                  <Badge className="ml-2 bg-green-100 text-green-800 hover:bg-green-100">
+                    Trending Up
+                  </Badge>
                 </div>
               </div>
-
+              
               <div>
-                <div className="mb-4 rounded-md overflow-hidden aspect-square bg-gray-100">
-                  <img 
-                    src={editedProduct.imageUrl} 
-                    alt={editedProduct.name}
-                    className="w-full h-full object-cover"
-                  />
+                <h4 className="text-sm font-medium text-muted-foreground flex items-center">
+                  <Users className="h-4 w-4 mr-1.5" />
+                  Competition Level
+                </h4>
+                <div className="mt-1 flex items-center">
+                  <span className="text-lg font-medium">{product.competitionLevel}/10</span>
+                  <span className={`ml-2 ${competition.color}`}>{competition.text}</span>
                 </div>
-                
-                <div className="mb-4">
-                  <Label htmlFor="imageUrl">Image URL</Label>
-                  <Input 
-                    id="imageUrl" 
-                    name="imageUrl" 
-                    value={editedProduct.imageUrl} 
-                    onChange={handleInputChange} 
-                  />
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground flex items-center">
+                  <DollarSign className="h-4 w-4 mr-1.5" />
+                  Profit Potential
+                </h4>
+                <div className="mt-1 flex items-center">
+                  <span className="text-lg font-medium">{product.profitPotential}% Margin</span>
+                  <span className={`ml-2 ${profit.color}`}>{profit.text}</span>
                 </div>
               </div>
             </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
-              <div className="bg-blue-50 p-4 rounded-lg flex items-center">
-                <TrendingUp className="mr-2 text-blue-500" />
-                <div>
-                  <p className="text-sm text-gray-600">Trend Score</p>
-                  <p className="font-semibold">{product.trendScore}/10</p>
-                </div>
-              </div>
-              
-              <div className="bg-green-50 p-4 rounded-lg flex items-center">
-                <DollarSign className="mr-2 text-green-500" />
-                <div>
-                  <p className="text-sm text-gray-600">Profit Margin</p>
-                  <p className="font-semibold">{product.profitMargin}</p>
-                </div>
-              </div>
-              
-              <div className="bg-yellow-50 p-4 rounded-lg flex items-center">
-                <Star className="mr-2 text-yellow-500" />
-                <div>
-                  <p className="text-sm text-gray-600">Competition</p>
-                  <p className="font-semibold">{product.competition}</p>
-                </div>
-              </div>
-              
-              <div className="bg-purple-50 p-4 rounded-lg flex items-center">
-                <Package className="mr-2 text-purple-500" />
-                <div>
-                  <p className="text-sm text-gray-600">Search Volume</p>
-                  <p className="font-semibold text-sm">{product.searchVolume}</p>
-                </div>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="pricing" className="space-y-4 mt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            
+            <div className="space-y-4">
               <div>
-                <div className="mb-4">
-                  <Label htmlFor="price">Selling Price ($)</Label>
-                  <Input 
-                    id="price" 
-                    name="price" 
-                    type="number" 
-                    step="0.01" 
-                    value={editedProduct.price} 
-                    onChange={handleInputChange} 
-                  />
-                </div>
-                
-                <div className="mb-4">
-                  <Label htmlFor="costPrice">Cost Price ($)</Label>
-                  <Input 
-                    id="costPrice" 
-                    name="costPrice" 
-                    type="number" 
-                    step="0.01" 
-                    value={editedProduct.costPrice} 
-                    onChange={handleInputChange} 
-                  />
-                  <p className="text-sm text-gray-500 mt-1">
-                    Profit margin: {(((parseFloat(editedProduct.price) - parseFloat(editedProduct.costPrice)) / parseFloat(editedProduct.costPrice)) * 100).toFixed(0)}%
-                  </p>
-                </div>
-                
-                <div className="mb-4">
-                  <Label htmlFor="salePrice">Sale Price ($) (Optional)</Label>
-                  <Input 
-                    id="salePrice" 
-                    name="salePrice" 
-                    type="number" 
-                    step="0.01" 
-                    value={editedProduct.salePrice} 
-                    onChange={handleInputChange} 
-                    placeholder="Leave empty for no sale"
-                  />
-                </div>
+                <h4 className="text-sm font-medium text-muted-foreground flex items-center">
+                  <BarChart3 className="h-4 w-4 mr-1.5" />
+                  Search Volume
+                </h4>
+                <p className="mt-1 text-lg font-medium">{product.searchVolume.toLocaleString()} monthly</p>
               </div>
               
               <div>
-                <div className="mb-4">
-                  <Label htmlFor="inventory">Initial Inventory</Label>
-                  <Input 
-                    id="inventory" 
-                    name="inventory" 
-                    type="number" 
-                    value={editedProduct.inventory} 
-                    onChange={handleInputChange} 
-                  />
-                </div>
-                
-                <div className="mb-4">
-                  <Label>Suppliers for this Product</Label>
-                  <div className="mt-2 border border-gray-200 rounded-md p-4">
-                    <p className="text-sm">
-                      3 suppliers found for this product category. View detailed supplier analysis in the Supplier Analysis section.
-                    </p>
-                    <Button 
-                      variant="link" 
-                      className="text-primary-600 p-0 h-auto mt-1"
-                      onClick={() => window.open('/supplier-analysis', '_blank')}
-                    >
-                      View suppliers
-                    </Button>
-                  </div>
-                </div>
-                
-                <div className="bg-gray-50 p-4 rounded-md mt-4">
-                  <h4 className="font-medium mb-2">Pricing Recommendations</h4>
-                  <ul className="text-sm space-y-2">
-                    <li className="flex items-center">
-                      <span className="h-2 w-2 bg-green-500 rounded-full mr-2"></span>
-                      Recommended price range: ${(parseFloat(editedProduct.costPrice) * 1.5).toFixed(2)} - ${(parseFloat(editedProduct.costPrice) * 2.5).toFixed(2)}
-                    </li>
-                    <li className="flex items-center">
-                      <span className="h-2 w-2 bg-blue-500 rounded-full mr-2"></span>
-                      Average market price: ${(parseFloat(editedProduct.costPrice) * 2.2).toFixed(2)}
-                    </li>
-                    <li className="flex items-center">
-                      <span className="h-2 w-2 bg-yellow-500 rounded-full mr-2"></span>
-                      Competitor price range: ${(parseFloat(editedProduct.costPrice) * 1.3).toFixed(2)} - ${(parseFloat(editedProduct.costPrice) * 3).toFixed(2)}
-                    </li>
-                  </ul>
+                <h4 className="text-sm font-medium text-muted-foreground flex items-center">
+                  <LineChart className="h-4 w-4 mr-1.5" />
+                  Sales Velocity
+                </h4>
+                <p className="mt-1 text-lg font-medium">{product.salesVelocity}/10</p>
+              </div>
+              
+              <div>
+                <h4 className="text-sm font-medium text-muted-foreground flex items-center">
+                  <Clock className="h-4 w-4 mr-1.5" />
+                  Seasonality
+                </h4>
+                <div className="mt-1">
+                  {product.seasonality.isHighlySeasonal ? (
+                    <div>
+                      <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-200">
+                        Seasonal Product
+                      </Badge>
+                      <p className="mt-1 text-sm">Peak months: {product.seasonality.peakMonths.join(', ')}</p>
+                    </div>
+                  ) : (
+                    <Badge variant="outline" className="bg-green-50 text-green-800 border-green-200">
+                      Year-round Demand
+                    </Badge>
+                  )}
                 </div>
               </div>
             </div>
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
 
-        <DialogFooter className="flex items-center justify-between sm:justify-end mt-6">
+        <div className="mt-4 bg-blue-50 p-4 rounded-lg border border-blue-100">
+          <h3 className="font-medium text-blue-900 flex items-center mb-2">
+            <Sparkles className="h-4 w-4 mr-1.5 text-blue-600" />
+            AI Recommendation
+          </h3>
+          <p className="text-blue-800">
+            {product.recommendationScore >= 80 
+              ? `This product shows excellent potential with strong growth and profit margins. Adding this to your store is highly recommended.`
+              : product.recommendationScore >= 60
+              ? `This product shows good potential with decent market trends. Consider adding it to your product lineup.`
+              : `This product has moderate potential. It may be worth testing in your store but monitor performance closely.`
+            }
+          </p>
+          
+          <ul className="mt-3 space-y-2">
+            <li className="flex items-start">
+              <ChevronRight className="h-4 w-4 text-blue-600 mt-0.5 mr-1.5 flex-shrink-0" />
+              <span className="text-blue-800">
+                {product.growthRate >= 15 
+                  ? `Strong growth rate of ${product.growthRate}% indicates increasing market demand`
+                  : `Moderate growth rate of ${product.growthRate}% shows steady market interest`
+                }
+              </span>
+            </li>
+            <li className="flex items-start">
+              <ChevronRight className="h-4 w-4 text-blue-600 mt-0.5 mr-1.5 flex-shrink-0" />
+              <span className="text-blue-800">
+                {product.competitionLevel <= 5
+                  ? `Low competition level (${product.competitionLevel}/10) suggests a good market opportunity`
+                  : `Be aware of the competition level (${product.competitionLevel}/10) when marketing this product`
+                }
+              </span>
+            </li>
+            <li className="flex items-start">
+              <ChevronRight className="h-4 w-4 text-blue-600 mt-0.5 mr-1.5 flex-shrink-0" />
+              <span className="text-blue-800">
+                {product.profitPotential >= 25
+                  ? `High profit margin potential of ${product.profitPotential}% is very attractive`
+                  : `Expected profit margin of ${product.profitPotential}% is within industry standards`
+                }
+              </span>
+            </li>
+          </ul>
+        </div>
+
+        <DialogFooter className="mt-6 flex items-center justify-between sm:justify-between gap-2">
           <Button variant="outline" onClick={onClose}>
-            Cancel
+            Close
           </Button>
-          <Button 
-            className="ml-2 gap-2" 
-            onClick={handleAddToStore}
-            disabled={addToStoreMutation.isPending}
-          >
-            <ShoppingCart className="h-4 w-4" />
-            {addToStoreMutation.isPending ? "Adding..." : "Add to Store"}
+          <Button onClick={() => onAddToStore(product)}>
+            Add to Store
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-};
-
-export default ProductDetailModal;
+}

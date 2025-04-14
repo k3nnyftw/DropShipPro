@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,12 +9,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TrendingProducts from "@/components/product-discovery/trending-products";
 import MarketTrend from "@/components/product-discovery/market-trend";
-import { Search } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { AIRecommendations } from "@/components/product-discovery/ai-recommendations";
+import { Search, Sparkles, TrendingUp, BarChart3 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 const ProductDiscovery: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<string>("ai");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
   const { data: categories } = useQuery({
     queryKey: ['/api/categories'],
     initialData: [
@@ -39,6 +47,45 @@ const ProductDiscovery: React.FC = () => {
     ]
   });
 
+  const addToStoreMutation = useMutation({
+    mutationFn: (product: any) => {
+      // Map AI product format to the format expected by the API
+      const newProduct = {
+        name: product.name,
+        description: `${product.name} - ${product.category}`,
+        price: (25 + Math.random() * 75).toFixed(2), // Generate a reasonable price
+        salePrice: null,
+        imageUrl: `https://source.unsplash.com/400x400/?${product.name.toLowerCase().replace(/\s+/g, '-')}`,
+        category: product.category,
+        rating: "4.5",
+        reviewCount: Math.floor(10 + Math.random() * 90),
+        inventory: 100,
+        trending: true
+      };
+      
+      return apiRequest('POST', '/api/products', newProduct);
+    },
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      toast({
+        title: "Product Added",
+        description: `${variables.name} has been added to your store.`,
+      });
+    },
+    onError: (error) => {
+      console.error('Error adding product to store:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add product to your store. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleAddToStore = (product: any) => {
+    addToStoreMutation.mutate(product);
+  };
+
   return (
     <>
       <div className="mb-6 flex justify-between items-center">
@@ -47,11 +94,9 @@ const ProductDiscovery: React.FC = () => {
           <p className="text-gray-600">Find trending products to add to your store</p>
         </div>
         <div>
-          <Button>
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Refresh Trends
+          <Button className="gap-2">
+            <Sparkles className="h-4 w-4" />
+            Auto-Add Products
           </Button>
         </div>
       </div>
@@ -109,11 +154,35 @@ const ProductDiscovery: React.FC = () => {
         </div>
       </Card>
 
-      {/* Trending Products */}
-      <TrendingProducts />
+      {/* Main Content Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="mb-6">
+          <TabsTrigger value="ai" className="gap-2">
+            <Sparkles className="h-4 w-4" />
+            AI Recommendations
+          </TabsTrigger>
+          <TabsTrigger value="trending" className="gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Trending Products
+          </TabsTrigger>
+          <TabsTrigger value="market" className="gap-2">
+            <BarChart3 className="h-4 w-4" />
+            Market Analysis
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Sales Trends Chart */}
-      <MarketTrend />
+        <TabsContent value="ai" className="mt-0">
+          <AIRecommendations onAddToStore={handleAddToStore} />
+        </TabsContent>
+
+        <TabsContent value="trending" className="mt-0">
+          <TrendingProducts />
+        </TabsContent>
+
+        <TabsContent value="market" className="mt-0">
+          <MarketTrend />
+        </TabsContent>
+      </Tabs>
     </>
   );
 };
