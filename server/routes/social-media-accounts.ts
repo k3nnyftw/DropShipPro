@@ -17,16 +17,12 @@ const router: Router = express.Router();
 router.get('/accounts', async (req: Request, res: Response) => {
   try {
     const accounts = await socialMediaService.getConnectedAccounts();
-    
-    res.json({
-      count: accounts.length,
-      accounts
-    });
+    res.json(accounts);
   } catch (error) {
-    console.error('Error getting connected accounts:', error);
-    res.status(500).json({
-      error: 'Failed to get connected accounts',
-      message: error instanceof Error ? error.message : 'Unknown error'
+    console.error('Error fetching social media accounts:', error);
+    res.status(500).json({ 
+      message: 'Failed to fetch social media accounts', 
+      error: error instanceof Error ? error.message : String(error) 
     });
   }
 });
@@ -39,26 +35,24 @@ router.post('/accounts/connect', async (req: Request, res: Response) => {
   try {
     const { platform, username, accessToken } = req.body;
     
-    // Validate required fields
     if (!platform || !username) {
-      return res.status(400).json({
-        error: 'Invalid account data',
-        message: 'Account requires platform and username'
+      return res.status(400).json({ 
+        message: 'Platform and username are required'
       });
     }
     
-    const newAccount = await socialMediaService.connectSocialAccount({
+    const account = await socialMediaService.connectSocialAccount({
       platform,
       username,
       accessToken
     });
     
-    res.status(201).json(newAccount);
+    res.status(201).json(account);
   } catch (error) {
-    console.error('Error connecting social account:', error);
-    res.status(500).json({
-      error: 'Failed to connect social account',
-      message: error instanceof Error ? error.message : 'Unknown error'
+    console.error('Error connecting social media account:', error);
+    res.status(500).json({ 
+      message: 'Failed to connect social media account', 
+      error: error instanceof Error ? error.message : String(error) 
     });
   }
 });
@@ -72,28 +66,23 @@ router.patch('/accounts/:id', async (req: Request, res: Response) => {
     const accountId = parseInt(req.params.id);
     const { active } = req.body;
     
-    if (isNaN(accountId)) {
-      return res.status(400).json({
-        error: 'Invalid account ID',
-        message: 'Account ID must be a number'
+    if (active === undefined) {
+      return res.status(400).json({ 
+        message: 'Active status is required'
       });
     }
     
-    if (typeof active !== 'boolean') {
-      return res.status(400).json({
-        error: 'Invalid status',
-        message: 'Active status must be a boolean'
-      });
-    }
-    
-    const updatedAccount = await socialMediaService.updateSocialAccountStatus(accountId, active);
+    const updatedAccount = await socialMediaService.updateSocialAccountStatus(
+      accountId, 
+      active
+    );
     
     res.json(updatedAccount);
   } catch (error) {
-    console.error('Error updating social account:', error);
-    res.status(500).json({
-      error: 'Failed to update social account',
-      message: error instanceof Error ? error.message : 'Unknown error'
+    console.error('Error updating social media account:', error);
+    res.status(500).json({ 
+      message: 'Failed to update social media account', 
+      error: error instanceof Error ? error.message : String(error) 
     });
   }
 });
@@ -106,24 +95,14 @@ router.delete('/accounts/:id', async (req: Request, res: Response) => {
   try {
     const accountId = parseInt(req.params.id);
     
-    if (isNaN(accountId)) {
-      return res.status(400).json({
-        error: 'Invalid account ID',
-        message: 'Account ID must be a number'
-      });
-    }
-    
     await socialMediaService.disconnectSocialAccount(accountId);
     
-    res.json({
-      success: true,
-      message: 'Social media account has been disconnected'
-    });
+    res.status(204).send();
   } catch (error) {
-    console.error('Error disconnecting social account:', error);
-    res.status(500).json({
-      error: 'Failed to disconnect social account',
-      message: error instanceof Error ? error.message : 'Unknown error'
+    console.error('Error disconnecting social media account:', error);
+    res.status(500).json({ 
+      message: 'Failed to disconnect social media account', 
+      error: error instanceof Error ? error.message : String(error) 
     });
   }
 });
