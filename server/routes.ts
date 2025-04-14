@@ -5,11 +5,15 @@ import { insertProductSchema, insertSupplierSchema, insertOrderSchema, insertCam
 import { z } from "zod";
 import paymentRoutes from "./routes/payment";
 import aiAnalyticsRoutes from "./routes/ai-analytics";
+import priceOptimizerRoutes from "./routes/price-optimizer";
+import orderFulfillmentRoutes from "./routes/order-fulfillment";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register route modules
   app.use('/api/payments', paymentRoutes);
   app.use('/api/ai-analytics', aiAnalyticsRoutes);
+  app.use('/api/price-optimizer', priceOptimizerRoutes);
+  app.use('/api/fulfillment', orderFulfillmentRoutes);
   
   // prefix all routes with /api
   
