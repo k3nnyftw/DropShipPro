@@ -2,12 +2,17 @@ import { pgTable, text, serial, integer, boolean, timestamp, json, decimal } fro
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Import subscription types
+import { SubscriptionPlan } from './subscription';
+
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   email: text("email").notNull(),
   fullName: text("full_name"),
+  plan: text("plan").default(SubscriptionPlan.FREE),
+  trialEndsAt: timestamp("trial_ends_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -86,6 +91,8 @@ export const insertUserSchema = createInsertSchema(users).pick({
   password: true,
   email: true,
   fullName: true,
+  plan: true,
+  trialEndsAt: true,
 });
 
 export const insertProductSchema = createInsertSchema(products).pick({
