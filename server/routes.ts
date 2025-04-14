@@ -3,8 +3,12 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertProductSchema, insertSupplierSchema, insertOrderSchema, insertCampaignSchema } from "../shared/schema";
 import { z } from "zod";
+import paymentRoutes from "./routes/payment";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Register payment routes
+  app.use('/api/payments', paymentRoutes);
+  
   // prefix all routes with /api
   
   // Dashboard endpoints
