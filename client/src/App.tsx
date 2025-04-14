@@ -10,6 +10,7 @@ import Advertising from "@/pages/advertising";
 import Orders from "@/pages/orders";
 import Automation from "@/pages/automation";
 import CompetitorTrackingPage from "@/pages/competitor-tracking";
+import ProductDescriptionGeneratorPage from "@/pages/product-description-generator";
 
 function App() {
   return (
@@ -24,6 +25,7 @@ function App() {
           <Route path="/orders" component={Orders} />
           <Route path="/automation" component={Automation} />
           <Route path="/competitor-tracking" component={CompetitorTrackingPage} />
+          <Route path="/product-description-generator" component={ProductDescriptionGeneratorPage} />
           <Route component={NotFound} />
         </Switch>
       </MainLayout>
