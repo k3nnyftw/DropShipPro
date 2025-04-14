@@ -1,101 +1,79 @@
 /**
- * AI-Powered Demand Forecasting Service
+ * Demand Forecasting Service
  * 
- * This service predicts future demand for products, allowing for proactive:
- * 1. Inventory planning and automatic reordering
- * 2. Price adjustments based on projected demand
- * 3. Automated supplier capacity planning
+ * This service uses AI to predict future product demand based on:
+ * 1. Historical sales data
+ * 2. Market trends 
+ * 3. Seasonal factors
+ * 4. Competitive landscape
+ * 
+ * The predictions are used to optimize inventory levels and pricing strategies.
  */
 
 import { storage } from "../storage";
 import { Product } from "../../shared/schema";
 
-interface SeasonalityFactor {
-  season: 'spring' | 'summer' | 'fall' | 'winter' | 'holiday';
-  impact: number; // -1.0 to 1.0 (negative means decreased demand, positive means increased)
+type TimeFrame = "7days" | "30days" | "90days";
+type Trend = "increasing" | "decreasing" | "stable";
+type MarketTrendDirection = "rising" | "falling" | "stable";
+type MarketTrendTimeframe = "short" | "medium" | "long";
+type ActionImpact = "high" | "medium" | "low";
+
+interface DemandForecast {
+  timeframe: TimeFrame;
+  demand: number;
+  confidence: number;
+  trend: Trend;
+}
+
+interface SeasonalFactor {
+  season: string;
+  impact: number; // -1.0 to 1.0, where negative means decreased demand
   confidence: number; // 0.0 to 1.0
 }
 
-interface MarketTrendFactor {
+interface MarketTrend {
   trend: string;
-  direction: 'rising' | 'falling' | 'stable';
+  direction: MarketTrendDirection;
   impact: number; // 0.0 to 1.0
-  timeframe: 'short' | 'medium' | 'long';
-  sources: string[];
+  timeframe: MarketTrendTimeframe;
 }
 
 interface CompetitiveFactor {
   competitorCount: number;
   marketSaturation: number; // 0.0 to 1.0
   uniqueSellingPoints: string[];
-  impact: number; // -1.0 to 1.0
+  impact: number; // -1.0 to 1.0, where negative means decreased demand
 }
 
-interface DemandForecast {
+interface RecommendedAction {
+  action: string;
+  description: string;
+  impact: ActionImpact;
+}
+
+interface ProductForecast {
   productId: number;
   productName: string;
-  currentDemand: number; // Units per month
-  forecastDemand: {
-    timeframe: '7days' | '30days' | '90days' | '180days';
-    demand: number;
-    confidence: number; // 0.0 to 1.0
-    trend: 'increasing' | 'decreasing' | 'stable';
-  }[];
-  seasonalFactors: SeasonalityFactor[];
-  marketTrends: MarketTrendFactor[];
+  currentDemand: number; // Current units per month
+  forecastDemand: DemandForecast[];
+  seasonalFactors: SeasonalFactor[];
+  marketTrends: MarketTrend[];
   competitiveFactors: CompetitiveFactor[];
-  recommendedActions: {
-    action: string;
-    impact: 'high' | 'medium' | 'low';
-    description: string;
-  }[];
-}
-
-interface ForecastOptions {
-  confidenceThreshold?: number; // Minimum confidence level for recommendations (0.0 to 1.0)
-  timeHorizon?: number; // Days to forecast
-  includeMarketAnalysis?: boolean;
-  includeCompetitorAnalysis?: boolean;
-  includeSeasonality?: boolean;
+  recommendedActions: RecommendedAction[];
 }
 
 /**
  * Generate demand forecasts for all products
- * @param options Options to customize the forecast generation
- * @returns Promise resolving to an array of demand forecasts
+ * @returns Promise resolving to forecasts for all products
  */
-export async function generateProductDemandForecasts(
-  options: ForecastOptions = {}
-): Promise<DemandForecast[]> {
-  // Default options
-  const defaultOptions: Required<ForecastOptions> = {
-    confidenceThreshold: 0.6,
-    timeHorizon: 90,
-    includeMarketAnalysis: true,
-    includeCompetitorAnalysis: true,
-    includeSeasonality: true
-  };
-  
-  const config = { ...defaultOptions, ...options };
-  
-  // Get all products
+export async function generateForecasts(): Promise<ProductForecast[]> {
   const products = await storage.getAllProducts();
-  const forecasts: DemandForecast[] = [];
-  
-  // Get historical orders to analyze sales patterns
-  const allOrders = await storage.getAllOrders();
+  const forecasts: ProductForecast[] = [];
   
   for (const product of products) {
     try {
-      // In a real implementation, we would:
-      // 1. Analyze historical sales data for this product
-      // 2. Incorporate market trend analysis from external APIs
-      // 3. Factor in seasonality based on category and time of year
-      // 4. Consider inventory turnover rates
-      // 5. Use machine learning to predict future demand
-      
-      // For this demo, we generate simulated forecast data
-      const forecast = await simulateDemandForecast(product, allOrders, config);
+      const forecast = await generateForecastForProduct(product.id);
       forecasts.push(forecast);
     } catch (error) {
       console.error(`Error generating forecast for product ${product.id}:`, error);
@@ -106,316 +84,119 @@ export async function generateProductDemandForecasts(
 }
 
 /**
- * Generate a demand forecast for a specific product
- * @param productId The ID of the product
- * @param options Options to customize the forecast generation
- * @returns Promise resolving to a demand forecast
+ * Generate demand forecast for a specific product
+ * @param productId ID of the product to forecast
+ * @returns Promise resolving to the product forecast
  */
-export async function generateProductDemandForecast(
-  productId: number,
-  options: ForecastOptions = {}
-): Promise<DemandForecast> {
-  // Default options
-  const defaultOptions: Required<ForecastOptions> = {
-    confidenceThreshold: 0.6,
-    timeHorizon: 90,
-    includeMarketAnalysis: true,
-    includeCompetitorAnalysis: true,
-    includeSeasonality: true
-  };
-  
-  const config = { ...defaultOptions, ...options };
-  
-  // Get the product
+export async function generateForecastForProduct(productId: number): Promise<ProductForecast> {
   const product = await storage.getProduct(productId);
   if (!product) {
     throw new Error(`Product with ID ${productId} not found`);
   }
   
-  // Get historical orders to analyze sales patterns
-  const allOrders = await storage.getAllOrders();
+  // In a real implementation, we would:
+  // 1. Retrieve historical sales data
+  // 2. Apply machine learning models to predict future demand
+  // 3. Incorporate market trend analysis
+  // 4. Analyze seasonal patterns
+  // 5. Consider competitive factors
   
-  // Generate the forecast
-  return simulateDemandForecast(product, allOrders, config);
-}
-
-/**
- * Apply demand forecast insights to optimize inventory and pricing
- * @param forecastId The ID of the forecast to apply
- * @returns Promise resolving to the results of applying the forecast
- */
-export async function applyDemandForecastInsights(
-  forecastId: number
-): Promise<{
-  forecastId: number;
-  productId: number;
-  inventoryAdjustments: any;
-  priceAdjustments: any;
-  supplierNotifications: any;
-  success: boolean;
-  message: string;
-}> {
-  // In a real implementation, this would:
-  // 1. Adjust inventory levels based on the forecast
-  // 2. Optimize pricing based on projected demand
-  // 3. Notify suppliers of expected order volumes
-  // 4. Schedule promotional activities during high-demand periods
-  
-  // For this demo, we just return a success response
-  return {
-    forecastId,
-    productId: Math.floor(Math.random() * 10) + 1,
-    inventoryAdjustments: {
-      reorderThresholdAdjusted: true,
-      optimalStockLevelAdjusted: true,
-      bufferStockIncreased: Math.random() > 0.5
-    },
-    priceAdjustments: {
-      basePriceAdjusted: Math.random() > 0.5,
-      dynamicPricingEnabled: true,
-      seasonalPricingScheduled: Math.random() > 0.3
-    },
-    supplierNotifications: {
-      advanceOrderWarningsSent: Math.random() > 0.4,
-      capacityReservationRequested: Math.random() > 0.7
-    },
-    success: true,
-    message: "Demand forecast insights successfully applied to product management systems"
-  };
-}
-
-/**
- * Schedule automatic demand forecasting and application of insights
- * @param intervalHours How often to run forecasting (in hours)
- * @param autoApply Whether to automatically apply insights
- * @returns Function to cancel scheduled forecasting
- */
-export function scheduleAutomaticForecasting(
-  intervalHours: number = 24, 
-  autoApply: boolean = true
-): () => void {
-  // Convert hours to milliseconds
-  const intervalMs = intervalHours * 60 * 60 * 1000;
-  
-  console.log(`Scheduling automatic demand forecasting every ${intervalHours} hours with auto-apply=${autoApply}`);
-  
-  // Set up the interval
-  const intervalId = setInterval(async () => {
-    try {
-      console.log('Running scheduled demand forecasting...');
-      const forecasts = await generateProductDemandForecasts();
-      console.log(`Generated ${forecasts.length} demand forecasts`);
-      
-      if (autoApply) {
-        // Apply insights from each forecast
-        for (const forecast of forecasts) {
-          try {
-            await applyDemandForecastInsights(forecast.productId);
-          } catch (error) {
-            console.error(`Error applying forecast insights for product ${forecast.productId}:`, error);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error in scheduled demand forecasting:', error);
-    }
-  }, intervalMs);
-  
-  // Return function to cancel the interval
-  return () => clearInterval(intervalId);
-}
-
-// --- Helper functions ---
-
-/**
- * Simulate demand forecasting for a product
- * @param product The product to forecast
- * @param allOrders All historical orders
- * @param config Configuration options
- * @returns Promise resolving to a simulated demand forecast
- */
-async function simulateDemandForecast(
-  product: Product,
-  allOrders: any[],
-  config: Required<ForecastOptions>
-): Promise<DemandForecast> {
-  // Get current date for seasonal analysis
-  const currentDate = new Date();
-  const currentMonth = currentDate.getMonth();
-  
-  // Determine current season
-  let currentSeason: 'spring' | 'summer' | 'fall' | 'winter' | 'holiday';
-  if (currentMonth >= 2 && currentMonth <= 4) {
-    currentSeason = 'spring';
-  } else if (currentMonth >= 5 && currentMonth <= 7) {
-    currentSeason = 'summer';
-  } else if (currentMonth >= 8 && currentMonth <= 10) {
-    currentSeason = 'fall';
-  } else {
-    currentSeason = currentMonth === 11 || currentMonth === 0 ? 'holiday' : 'winter';
-  }
+  // For this demo, we'll simulate a forecast based on the product
   
   // Simulate current demand (units per month)
-  const currentDemand = Math.floor(Math.random() * 100) + 10;
+  const baseCurrentDemand = 50 + Math.floor(Math.random() * 150);
   
-  // Generate forecasted demand for different timeframes
-  const forecastDemand = [
+  // Determine if the product is trending based on its properties
+  const isTrending = product.trending || Math.random() > 0.7;
+  
+  // Adjust current demand based on product characteristics
+  let currentDemand = baseCurrentDemand;
+  
+  // Adjust based on price (higher price = lower demand)
+  const productPrice = parseFloat(product.price);
+  if (productPrice > 100) {
+    currentDemand = Math.round(currentDemand * 0.8);
+  } else if (productPrice < 30) {
+    currentDemand = Math.round(currentDemand * 1.3);
+  }
+  
+  // Adjust based on trending status
+  if (isTrending) {
+    currentDemand = Math.round(currentDemand * 1.5);
+  }
+  
+  // Generate forecasts for different timeframes
+  const forecastDemand: DemandForecast[] = [
+    generateTimeframeForecast("7days", currentDemand, isTrending),
+    generateTimeframeForecast("30days", currentDemand, isTrending),
+    generateTimeframeForecast("90days", currentDemand, isTrending)
+  ];
+  
+  // Generate seasonal factors
+  const seasonalFactors: SeasonalFactor[] = [
     {
-      timeframe: '7days' as const,
-      demand: Math.round(currentDemand / 4), // Weekly demand
-      confidence: 0.85 + (Math.random() * 0.15),
-      trend: ['increasing', 'decreasing', 'stable'][Math.floor(Math.random() * 3)] as 'increasing' | 'decreasing' | 'stable'
+      season: "summer",
+      impact: -0.2 + (Math.random() * 0.6), // -0.2 to 0.4
+      confidence: 0.7 + (Math.random() * 0.3)
     },
     {
-      timeframe: '30days' as const,
-      demand: currentDemand,
-      confidence: 0.7 + (Math.random() * 0.2),
-      trend: ['increasing', 'decreasing', 'stable'][Math.floor(Math.random() * 3)] as 'increasing' | 'decreasing' | 'stable'
+      season: "holiday season",
+      impact: 0.1 + (Math.random() * 0.5), // 0.1 to 0.6
+      confidence: 0.8 + (Math.random() * 0.2)
     },
     {
-      timeframe: '90days' as const,
-      demand: Math.round(currentDemand * (0.8 + (Math.random() * 0.5))),
-      confidence: 0.5 + (Math.random() * 0.3),
-      trend: ['increasing', 'decreasing', 'stable'][Math.floor(Math.random() * 3)] as 'increasing' | 'decreasing' | 'stable'
+      season: "back to school",
+      impact: -0.1 + (Math.random() * 0.5), // -0.1 to 0.4
+      confidence: 0.6 + (Math.random() * 0.3)
     }
   ];
   
-  // If requested time horizon is greater than 90 days, add 180-day forecast
-  if (config.timeHorizon > 90) {
-    forecastDemand.push({
-      timeframe: '180days' as const,
-      demand: Math.round(currentDemand * (0.7 + (Math.random() * 0.8))),
-      confidence: 0.4 + (Math.random() * 0.3),
-      trend: ['increasing', 'decreasing', 'stable'][Math.floor(Math.random() * 3)] as 'increasing' | 'decreasing' | 'stable'
-    });
-  }
-  
-  // Generate seasonal factors
-  const seasonalFactors: SeasonalityFactor[] = [];
-  if (config.includeSeasonality) {
-    // Add current season
-    seasonalFactors.push({
-      season: currentSeason,
-      impact: -0.3 + (Math.random() * 0.6), // Random impact between -0.3 and 0.3
-      confidence: 0.7 + (Math.random() * 0.3)
-    });
-    
-    // Add upcoming season
-    const nextSeasonIndex = ['spring', 'summer', 'fall', 'winter', 'holiday'].indexOf(currentSeason);
-    const nextSeason = ['spring', 'summer', 'fall', 'winter', 'holiday'][(nextSeasonIndex + 1) % 5] as 'spring' | 'summer' | 'fall' | 'winter' | 'holiday';
-    
-    seasonalFactors.push({
-      season: nextSeason,
-      impact: -0.3 + (Math.random() * 0.6),
-      confidence: 0.5 + (Math.random() * 0.3)
-    });
-    
-    // Add holiday season if not already included
-    if (currentSeason !== 'holiday' && nextSeason !== 'holiday') {
-      seasonalFactors.push({
-        season: 'holiday',
-        impact: 0.2 + (Math.random() * 0.5), // Holidays usually have positive impact
-        confidence: 0.6 + (Math.random() * 0.2)
-      });
+  // Generate market trends
+  const marketTrends: MarketTrend[] = [
+    {
+      trend: "Online shopping",
+      direction: Math.random() > 0.2 ? "rising" : "stable",
+      impact: 0.3 + (Math.random() * 0.4), // 0.3 to 0.7
+      timeframe: "long"
+    },
+    {
+      trend: product.category || "Product category",
+      direction: Math.random() > 0.5 ? "rising" : "falling",
+      impact: 0.2 + (Math.random() * 0.5), // 0.2 to 0.7
+      timeframe: "medium"
+    },
+    {
+      trend: `${product.name} searches`,
+      direction: isTrending ? "rising" : (Math.random() > 0.5 ? "stable" : "falling"),
+      impact: 0.1 + (Math.random() * 0.4), // 0.1 to 0.5
+      timeframe: "short"
     }
-  }
-  
-  // Generate market trend factors
-  const marketTrends: MarketTrendFactor[] = [];
-  if (config.includeMarketAnalysis) {
-    // Add 2-3 market trends
-    const trendCount = 2 + Math.floor(Math.random() * 2);
-    const possibleTrends = [
-      "Social media popularity",
-      "Sustainable products",
-      "Minimalist design",
-      "Smart home integration",
-      "Health-conscious consumers",
-      "Remote work essentials",
-      "Eco-friendly packaging",
-      "Subscription model growth",
-      "Direct-to-consumer shift"
-    ];
-    
-    const selectedTrends = [...possibleTrends].sort(() => 0.5 - Math.random()).slice(0, trendCount);
-    
-    for (const trend of selectedTrends) {
-      marketTrends.push({
-        trend,
-        direction: ['rising', 'falling', 'stable'][Math.floor(Math.random() * 3)] as 'rising' | 'falling' | 'stable',
-        impact: 0.2 + (Math.random() * 0.6),
-        timeframe: ['short', 'medium', 'long'][Math.floor(Math.random() * 3)] as 'short' | 'medium' | 'long',
-        sources: ["Market research", "Consumer surveys", "Social media analysis"]
-      });
-    }
-  }
+  ];
   
   // Generate competitive factors
-  const competitiveFactors: CompetitiveFactor[] = [];
-  if (config.includeCompetitorAnalysis) {
-    competitiveFactors.push({
-      competitorCount: Math.floor(Math.random() * 20) + 3,
-      marketSaturation: 0.3 + (Math.random() * 0.6),
+  const competitiveFactors: CompetitiveFactor[] = [
+    {
+      competitorCount: 3 + Math.floor(Math.random() * 5),
+      marketSaturation: 0.3 + (Math.random() * 0.5), // 0.3 to 0.8
       uniqueSellingPoints: [
         "Quality",
         "Price",
         "Fast shipping",
-        "Customer service",
-        "Warranty"
-      ].sort(() => 0.5 - Math.random()).slice(0, 2 + Math.floor(Math.random() * 3)),
-      impact: -0.2 + (Math.random() * 0.4)
-    });
-  }
-  
-  // Generate recommended actions
-  const allPossibleActions = [
-    {
-      action: "Increase inventory",
-      impact: 'high' as const,
-      description: `Increase inventory by ${Math.floor(Math.random() * 20) + 10}% to meet projected demand spike`
-    },
-    {
-      action: "Decrease inventory",
-      impact: 'medium' as const,
-      description: `Reduce inventory by ${Math.floor(Math.random() * 15) + 5}% to avoid excess stock during low demand`
-    },
-    {
-      action: "Raise prices",
-      impact: 'medium' as const,
-      description: `Increase prices by ${Math.floor(Math.random() * 10) + 3}% during high demand period`
-    },
-    {
-      action: "Lower prices",
-      impact: 'high' as const,
-      description: `Reduce prices by ${Math.floor(Math.random() * 15) + 5}% to remain competitive`
-    },
-    {
-      action: "Run promotion",
-      impact: 'high' as const,
-      description: "Launch promotional campaign during forecasted demand increase"
-    },
-    {
-      action: "Find alternate suppliers",
-      impact: 'medium' as const,
-      description: "Identify backup suppliers to handle potential supply chain disruptions"
-    },
-    {
-      action: "Bundle with complementary products",
-      impact: 'medium' as const,
-      description: "Create product bundles to increase average order value"
-    },
-    {
-      action: "Adjust reorder threshold",
-      impact: 'low' as const,
-      description: `Set reorder threshold to ${Math.floor(Math.random() * 30) + 10} units based on lead time and demand`
+        "Customer service"
+      ].slice(0, 2 + Math.floor(Math.random() * 3)),
+      impact: -0.3 + (Math.random() * 0.6) // -0.3 to 0.3
     }
   ];
   
-  // Select 2-4 recommended actions based on the forecast
-  const recommendCount = 2 + Math.floor(Math.random() * 3);
-  const recommendedActions = [...allPossibleActions].sort(() => 0.5 - Math.random()).slice(0, recommendCount);
+  // Generate recommended actions based on forecasts
+  const recommendedActions: RecommendedAction[] = generateRecommendedActions(
+    product,
+    forecastDemand,
+    seasonalFactors,
+    marketTrends,
+    competitiveFactors
+  );
   
-  // Return the complete forecast
   return {
     productId: product.id,
     productName: product.name,
@@ -426,4 +207,263 @@ async function simulateDemandForecast(
     competitiveFactors,
     recommendedActions
   };
+}
+
+/**
+ * Apply insights from a forecast
+ * @param productId ID of the product to apply forecast insights to
+ * @returns Promise resolving to the results of applying insights
+ */
+export async function applyForecastInsights(productId: number): Promise<{
+  success: boolean;
+  productId: number;
+  productName: string;
+  appliedActions: {
+    action: string;
+    result: string;
+    impact: string;
+  }[];
+}> {
+  const product = await storage.getProduct(productId);
+  if (!product) {
+    throw new Error(`Product with ID ${productId} not found`);
+  }
+  
+  const forecast = await generateForecastForProduct(productId);
+  
+  // In a real implementation, we would:
+  // 1. Update inventory levels based on forecast
+  // 2. Adjust pricing strategy
+  // 3. Update marketing tactics
+  // 4. Modify supplier orders
+  
+  // For this demo, we'll simulate applying the insights
+  
+  const appliedActions = forecast.recommendedActions.map(action => {
+    return {
+      action: action.action,
+      result: `Successfully applied: ${action.description}`,
+      impact: action.impact
+    };
+  });
+  
+  return {
+    success: true,
+    productId: product.id,
+    productName: product.name,
+    appliedActions
+  };
+}
+
+/**
+ * Schedule automatic forecasting
+ * @param intervalHours How often to generate forecasts (in hours)
+ * @param autoApply Whether to automatically apply insights
+ * @returns Promise resolving to the schedule configuration
+ */
+export async function scheduleForecasting(
+  intervalHours: number,
+  autoApply: boolean
+): Promise<{
+  success: boolean;
+  scheduledAt: Date;
+  intervalHours: number;
+  autoApply: boolean;
+  nextRun: Date;
+}> {
+  // In a real implementation, we would:
+  // 1. Store the schedule configuration in a database
+  // 2. Set up a job scheduler to run forecasts at the specified interval
+  // 3. Configure automatic application of insights if enabled
+  
+  // For this demo, we'll just return the configuration
+  
+  const scheduledAt = new Date();
+  const nextRun = new Date();
+  nextRun.setHours(nextRun.getHours() + intervalHours);
+  
+  return {
+    success: true,
+    scheduledAt,
+    intervalHours,
+    autoApply,
+    nextRun
+  };
+}
+
+// --- Helper functions ---
+
+/**
+ * Generate a forecast for a specific timeframe
+ * @param timeframe The timeframe to forecast
+ * @param currentDemand Current monthly demand
+ * @param isTrending Whether the product is trending
+ * @returns Forecast for the timeframe
+ */
+function generateTimeframeForecast(
+  timeframe: TimeFrame,
+  currentDemand: number,
+  isTrending: boolean
+): DemandForecast {
+  let trend: Trend;
+  let demandMultiplier: number;
+  let confidence: number;
+  
+  // Randomize the trend with a bias based on trending status
+  const trendRandom = Math.random();
+  if (isTrending) {
+    // Trending products are more likely to increase
+    if (trendRandom < 0.7) {
+      trend = "increasing";
+      demandMultiplier = 1.1 + (Math.random() * 0.3); // 1.1 to 1.4
+    } else if (trendRandom < 0.9) {
+      trend = "stable";
+      demandMultiplier = 0.95 + (Math.random() * 0.1); // 0.95 to 1.05
+    } else {
+      trend = "decreasing";
+      demandMultiplier = 0.8 + (Math.random() * 0.15); // 0.8 to 0.95
+    }
+    confidence = 0.7 + (Math.random() * 0.3); // 0.7 to 1.0
+  } else {
+    // Non-trending products have more varied outcomes
+    if (trendRandom < 0.3) {
+      trend = "increasing";
+      demandMultiplier = 1.05 + (Math.random() * 0.15); // 1.05 to 1.2
+    } else if (trendRandom < 0.7) {
+      trend = "stable";
+      demandMultiplier = 0.95 + (Math.random() * 0.1); // 0.95 to 1.05
+    } else {
+      trend = "decreasing";
+      demandMultiplier = 0.7 + (Math.random() * 0.25); // 0.7 to 0.95
+    }
+    confidence = 0.5 + (Math.random() * 0.4); // 0.5 to 0.9
+  }
+  
+  // Adjust multiplier based on timeframe
+  // Longer timeframes have higher multipliers for increasing trends
+  // and lower multipliers for decreasing trends
+  if (timeframe === "30days") {
+    if (trend === "increasing") {
+      demandMultiplier += 0.1;
+    } else if (trend === "decreasing") {
+      demandMultiplier -= 0.05;
+    }
+    confidence -= 0.05; // Less confident about medium-term forecasts
+  } else if (timeframe === "90days") {
+    if (trend === "increasing") {
+      demandMultiplier += 0.2;
+    } else if (trend === "decreasing") {
+      demandMultiplier -= 0.1;
+    }
+    confidence -= 0.1; // Even less confident about long-term forecasts
+  }
+  
+  // Calculate demand based on timeframe
+  let demand: number;
+  if (timeframe === "7days") {
+    demand = Math.round((currentDemand / 30) * 7 * demandMultiplier);
+  } else if (timeframe === "30days") {
+    demand = Math.round(currentDemand * demandMultiplier);
+  } else {
+    demand = Math.round(currentDemand * 3 * demandMultiplier);
+  }
+  
+  return {
+    timeframe,
+    demand,
+    confidence,
+    trend
+  };
+}
+
+/**
+ * Generate recommended actions based on forecasts and factors
+ * @param product The product
+ * @param forecasts Demand forecasts
+ * @param seasonalFactors Seasonal factors
+ * @param marketTrends Market trends
+ * @param competitiveFactors Competitive factors
+ * @returns Array of recommended actions
+ */
+function generateRecommendedActions(
+  product: Product,
+  forecasts: DemandForecast[],
+  seasonalFactors: SeasonalFactor[],
+  marketTrends: MarketTrend[],
+  competitiveFactors: CompetitiveFactor[]
+): RecommendedAction[] {
+  const actions: RecommendedAction[] = [];
+  
+  // Check short-term forecast
+  const shortTerm = forecasts.find(f => f.timeframe === "7days");
+  if (shortTerm && shortTerm.trend === "increasing") {
+    actions.push({
+      action: "Increase inventory levels",
+      description: `Prepare for increased demand in the next 7 days (+${Math.round((shortTerm.demand / (product.inventory || 10) - 1) * 100)}%).`,
+      impact: "high"
+    });
+  } else if (shortTerm && shortTerm.trend === "decreasing") {
+    actions.push({
+      action: "Run a limited-time promotion",
+      description: "Combat decreasing demand with a 7-day promotion to boost sales.",
+      impact: "medium"
+    });
+  }
+  
+  // Check medium-term forecast
+  const mediumTerm = forecasts.find(f => f.timeframe === "30days");
+  if (mediumTerm && mediumTerm.trend === "increasing" && mediumTerm.confidence > 0.7) {
+    actions.push({
+      action: "Order additional stock",
+      description: "Long-term demand is increasing with high confidence. Place larger orders with suppliers.",
+      impact: "high"
+    });
+  }
+  
+  // Check seasonal factors
+  const upcomingSeason = seasonalFactors.find(s => s.impact > 0.2);
+  if (upcomingSeason) {
+    actions.push({
+      action: `Prepare for ${upcomingSeason.season}`,
+      description: `${upcomingSeason.season.charAt(0).toUpperCase() + upcomingSeason.season.slice(1)} is coming with projected +${Math.round(upcomingSeason.impact * 100)}% demand impact. Adjust inventory and marketing.`,
+      impact: upcomingSeason.impact > 0.4 ? "high" : "medium"
+    });
+  }
+  
+  // Check market trends
+  const significantTrend = marketTrends.find(t => t.impact > 0.4 && t.direction === "rising");
+  if (significantTrend) {
+    actions.push({
+      action: `Leverage "${significantTrend.trend}" trend`,
+      description: `Update marketing to emphasize connection to the rising "${significantTrend.trend}" trend.`,
+      impact: "medium"
+    });
+  }
+  
+  // Check competitive factors
+  const competitiveFactor = competitiveFactors[0];
+  if (competitiveFactor && competitiveFactor.marketSaturation > 0.7) {
+    actions.push({
+      action: "Differentiate from competitors",
+      description: `Market is ${Math.round(competitiveFactor.marketSaturation * 100)}% saturated with ${competitiveFactor.competitorCount} competitors. Emphasize unique selling points.`,
+      impact: "high"
+    });
+  } else if (competitiveFactor && competitiveFactor.impact < -0.2) {
+    actions.push({
+      action: "Adjust pricing strategy",
+      description: "Competitors are negatively impacting demand. Consider price adjustment or bundle offers.",
+      impact: "medium"
+    });
+  }
+  
+  // Ensure we have at least one recommendation
+  if (actions.length === 0) {
+    actions.push({
+      action: "Monitor market conditions",
+      description: "No significant changes predicted. Continue monitoring product performance.",
+      impact: "low"
+    });
+  }
+  
+  return actions;
 }
