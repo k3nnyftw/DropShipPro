@@ -29,6 +29,11 @@ const Header: React.FC = () => {
               Products
             </a>
           </Link>
+          <Link href="/product-description-generator">
+            <a className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
+              AI Content
+            </a>
+          </Link>
           <Link href="/orders">
             <a className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
               Orders
@@ -37,6 +42,11 @@ const Header: React.FC = () => {
           <Link href="/supplier-analysis">
             <a className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
               Suppliers
+            </a>
+          </Link>
+          <Link href="/competitor-tracking">
+            <a className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
+              Competitors
             </a>
           </Link>
           <Link href="/advertising">
