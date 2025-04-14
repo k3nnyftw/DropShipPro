@@ -13,10 +13,11 @@ import CompetitorTrackingPage from "@/pages/competitor-tracking";
 import ProductDescriptionGeneratorPage from "@/pages/product-description-generator";
 import EmailMarketingPage from "@/pages/email-marketing";
 import SocialSharingPage from "@/pages/social-sharing";
+import { ThemeProvider } from "@/contexts/ThemeContext";
 
 function App() {
   return (
-    <>
+    <ThemeProvider>
       <MainLayout>
         <Switch>
           <Route path="/" component={Dashboard} />
@@ -34,7 +35,7 @@ function App() {
         </Switch>
       </MainLayout>
       <Toaster />
-    </>
+    </ThemeProvider>
   );
 }
 
