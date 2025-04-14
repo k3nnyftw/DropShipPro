@@ -8,6 +8,7 @@ import ProductDiscovery from "@/pages/product-discovery";
 import SupplierAnalysis from "@/pages/supplier-analysis";
 import Advertising from "@/pages/advertising";
 import Orders from "@/pages/orders";
+import Automation from "@/pages/automation";
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
           <Route path="/supplier-analysis" component={SupplierAnalysis} />
           <Route path="/advertising" component={Advertising} />
           <Route path="/orders" component={Orders} />
+          <Route path="/automation" component={Automation} />
           <Route component={NotFound} />
         </Switch>
       </MainLayout>
