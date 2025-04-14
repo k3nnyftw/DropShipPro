@@ -9,24 +9,12 @@ const router = Router();
  */
 router.get('/products', async (req: Request, res: Response) => {
   try {
-    const options = {
-      confidenceThreshold: req.query.confidence ? parseFloat(req.query.confidence as string) : undefined,
-      timeHorizon: req.query.timeHorizon ? parseInt(req.query.timeHorizon as string) : undefined,
-      includeMarketAnalysis: req.query.includeMarket !== 'false',
-      includeCompetitorAnalysis: req.query.includeCompetitors !== 'false',
-      includeSeasonality: req.query.includeSeasonality !== 'false'
-    };
-    
-    const forecasts = await demandForecasting.generateProductDemandForecasts(options);
-    
-    res.json({
-      count: forecasts.length,
-      forecasts
-    });
+    const forecasts = await demandForecasting.generateForecasts();
+    res.json({ forecasts });
   } catch (error) {
-    console.error('Error generating demand forecasts:', error);
+    console.error('Error generating forecasts:', error);
     res.status(500).json({ 
-      error: 'Failed to generate demand forecasts',
+      error: 'Failed to generate forecasts',
       message: error instanceof Error ? error.message : 'Unknown error'
     });
   }
@@ -47,21 +35,12 @@ router.get('/products/:productId', async (req: Request, res: Response) => {
       });
     }
     
-    const options = {
-      confidenceThreshold: req.query.confidence ? parseFloat(req.query.confidence as string) : undefined,
-      timeHorizon: req.query.timeHorizon ? parseInt(req.query.timeHorizon as string) : undefined,
-      includeMarketAnalysis: req.query.includeMarket !== 'false',
-      includeCompetitorAnalysis: req.query.includeCompetitors !== 'false',
-      includeSeasonality: req.query.includeSeasonality !== 'false'
-    };
-    
-    const forecast = await demandForecasting.generateProductDemandForecast(productId, options);
-    
+    const forecast = await demandForecasting.generateForecastForProduct(productId);
     res.json(forecast);
   } catch (error) {
-    console.error('Error generating demand forecast:', error);
+    console.error('Error generating forecast for product:', error);
     res.status(500).json({ 
-      error: 'Failed to generate demand forecast',
+      error: 'Failed to generate forecast for product',
       message: error instanceof Error ? error.message : 'Unknown error'
     });
   }
@@ -82,8 +61,7 @@ router.post('/apply/:forecastId', async (req: Request, res: Response) => {
       });
     }
     
-    const result = await demandForecasting.applyDemandForecastInsights(forecastId);
-    
+    const result = await demandForecasting.applyForecastInsights(forecastId);
     res.json(result);
   } catch (error) {
     console.error('Error applying forecast insights:', error);
@@ -102,42 +80,22 @@ router.post('/schedule', async (req: Request, res: Response) => {
   try {
     const { 
       intervalHours = 24,
-      autoApply = true
+      autoApply = false
     } = req.body;
     
-    // Validate input parameters
-    if (typeof intervalHours !== 'number' || intervalHours < 1) {
+    if (intervalHours < 1) {
       return res.status(400).json({
         error: 'Invalid interval',
-        message: 'Interval must be a positive number in hours (minimum 1)'
+        message: 'Interval must be at least 1 hour'
       });
     }
     
-    if (typeof autoApply !== 'boolean') {
-      return res.status(400).json({
-        error: 'Invalid autoApply parameter',
-        message: 'autoApply must be a boolean value'
-      });
-    }
-    
-    // In a real application, you would store this configuration in a database
-    // and potentially cancel any existing scheduled forecasting
-    
-    // Call the service to schedule automatic forecasting
-    demandForecasting.scheduleAutomaticForecasting(intervalHours, autoApply);
-    
-    res.json({
-      message: `Automatic demand forecasting scheduled every ${intervalHours} hours`,
-      settings: {
-        intervalHours,
-        autoApply
-      },
-      status: 'active'
-    });
+    const result = await demandForecasting.scheduleForecasting(intervalHours, autoApply);
+    res.json(result);
   } catch (error) {
-    console.error('Error scheduling demand forecasting:', error);
+    console.error('Error scheduling forecasting:', error);
     res.status(500).json({ 
-      error: 'Failed to schedule demand forecasting',
+      error: 'Failed to schedule forecasting',
       message: error instanceof Error ? error.message : 'Unknown error'
     });
   }

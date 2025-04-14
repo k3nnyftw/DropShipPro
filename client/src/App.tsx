@@ -9,6 +9,7 @@ import SupplierAnalysis from "@/pages/supplier-analysis";
 import Advertising from "@/pages/advertising";
 import Orders from "@/pages/orders";
 import Automation from "@/pages/automation";
+import CompetitorTrackingPage from "@/pages/competitor-tracking";
 
 function App() {
   return (
@@ -22,6 +23,7 @@ function App() {
           <Route path="/advertising" component={Advertising} />
           <Route path="/orders" component={Orders} />
           <Route path="/automation" component={Automation} />
+          <Route path="/competitor-tracking" component={CompetitorTrackingPage} />
           <Route component={NotFound} />
         </Switch>
       </MainLayout>
