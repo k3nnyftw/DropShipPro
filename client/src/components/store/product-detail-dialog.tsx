@@ -11,11 +11,12 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Star, StarHalf, ShoppingCart, Pencil, Save, Trash, RefreshCw, Tag } from "lucide-react";
+import { Star, StarHalf, ShoppingCart, Pencil, Save, Trash, RefreshCw, Tag, CreditCard } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { CheckoutPayment } from "./checkout-payment";
 
 interface Product {
   id: number;
@@ -49,6 +50,8 @@ const ProductDetailDialog: React.FC<ProductDetailDialogProps> = ({
   const [activeTab, setActiveTab] = useState("details");
   const [isEditing, setIsEditing] = useState(false);
   const [editedProduct, setEditedProduct] = useState<Product | null>(null);
+  const [showCheckout, setShowCheckout] = useState(false);
+  const [paymentCompleted, setPaymentCompleted] = useState(false);
 
   // Initialize the edit form when the modal opens with a product
   React.useEffect(() => {
@@ -147,6 +150,45 @@ const ProductDetailDialog: React.FC<ProductDetailDialogProps> = ({
     }
   };
 
+  const handleAddToCart = () => {
+    if (!product) return;
+    
+    toast({
+      title: 'Added to Cart',
+      description: `${product.name} has been added to your cart.`,
+    });
+  };
+
+  const handleBuyNow = () => {
+    setShowCheckout(true);
+  };
+
+  const handlePaymentComplete = (success: boolean, paymentId?: string) => {
+    if (!product) return;
+    
+    if (success) {
+      setPaymentCompleted(true);
+      toast({
+        title: 'Order Completed',
+        description: `Your purchase of ${product.name} was successful!`,
+      });
+      
+      // Create an order record in the system after successful payment
+      // This could be implemented with a mutation to create an order
+    } else {
+      toast({
+        title: 'Payment Failed',
+        description: 'Your payment could not be processed. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const handleResetCheckout = () => {
+    setShowCheckout(false);
+    setPaymentCompleted(false);
+  };
+
   const renderStars = (rating: number) => {
     const stars = [];
     const fullStars = Math.floor(rating);
@@ -170,12 +212,20 @@ const ProductDetailDialog: React.FC<ProductDetailDialogProps> = ({
 
   if (!product || !editedProduct) return null;
 
+  // Reset the checkout state when the dialog closes
+  const handleCloseDialog = () => {
+    handleResetCheckout();
+    onClose();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={handleCloseDialog}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center justify-between">
-            <span>{isEditing ? "Edit Product" : "Product Details"}</span>
+            <span>
+              {isEditing ? "Edit Product" : showCheckout ? "Checkout" : "Product Details"}
+            </span>
             <div className="flex items-center gap-2">
               {isEditing ? (
                 <>
@@ -199,6 +249,16 @@ const ProductDetailDialog: React.FC<ProductDetailDialogProps> = ({
                     Save
                   </Button>
                 </>
+              ) : showCheckout ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1"
+                  onClick={handleResetCheckout}
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Back to Product
+                </Button>
               ) : (
                 <Button
                   variant="outline"
@@ -214,11 +274,35 @@ const ProductDetailDialog: React.FC<ProductDetailDialogProps> = ({
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid grid-cols-2">
-            <TabsTrigger value="details">Product Details</TabsTrigger>
-            <TabsTrigger value="inventory">Inventory & Pricing</TabsTrigger>
-          </TabsList>
+        {showCheckout ? (
+          <div className="py-4">
+            {paymentCompleted ? (
+              <div className="text-center py-8">
+                <div className="bg-green-100 text-green-800 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold mb-2">Payment Successful!</h3>
+                <p className="text-gray-600 mb-6">
+                  Thank you for your purchase. Your order has been processed successfully.
+                </p>
+                <Button onClick={handleResetCheckout}>Continue Shopping</Button>
+              </div>
+            ) : (
+              <CheckoutPayment 
+                amount={product.price * 100} // Convert to cents for Stripe
+                orderId={product.id}
+                onPaymentComplete={handlePaymentComplete}
+              />
+            )}
+          </div>
+        ) : (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid grid-cols-2">
+              <TabsTrigger value="details">Product Details</TabsTrigger>
+              <TabsTrigger value="inventory">Inventory & Pricing</TabsTrigger>
+            </TabsList>
 
           <TabsContent value="details" className="space-y-4 mt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -448,9 +532,12 @@ const ProductDetailDialog: React.FC<ProductDetailDialogProps> = ({
             </div>
           </TabsContent>
         </Tabs>
+        )}
 
         <DialogFooter className="flex items-center justify-between sm:justify-between mt-6">
-          {isEditing ? (
+          {showCheckout ? (
+            <div /> // Empty div to maintain spacing when in checkout mode
+          ) : isEditing ? (
             <Button
               variant="destructive"
               onClick={handleDelete}
@@ -465,11 +552,24 @@ const ProductDetailDialog: React.FC<ProductDetailDialogProps> = ({
             </Button>
           )}
           
-          {!isEditing && (
-            <Button className="gap-2">
-              <ShoppingCart className="h-4 w-4" />
-              Add to Cart
-            </Button>
+          {!isEditing && !showCheckout && (
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                className="gap-2"
+                onClick={handleAddToCart}
+              >
+                <ShoppingCart className="h-4 w-4" />
+                Add to Cart
+              </Button>
+              <Button 
+                className="gap-2"
+                onClick={handleBuyNow}
+              >
+                <CreditCard className="h-4 w-4" />
+                Buy Now
+              </Button>
+            </div>
           )}
         </DialogFooter>
       </DialogContent>
