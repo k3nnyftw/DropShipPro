@@ -319,11 +319,10 @@ export default function SocialShare() {
   // Share now mutation
   const shareNowMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest('POST', `/api/social-media/share-now/${selectedProductId}`, {
+      return await apiRequest<{ results: Array<{success: boolean, platform: string, message: string}> }>('POST', `/api/social-media/share-now/${selectedProductId}`, {
         platforms: selectedPlatforms,
         options: postFormat
       });
-      return response as { results: Array<{success: boolean, platform: string, message: string}> };
     },
     onSuccess: (data: { results: Array<{success: boolean, platform: string, message: string}> }) => {
       const successCount = data?.results?.filter((r) => r.success).length || 0;
@@ -353,12 +352,11 @@ export default function SocialShare() {
       const [hours, minutes] = selectedTimeSlot.split(':').map(Number);
       scheduledDateTime.setHours(hours, minutes, 0, 0);
       
-      const response = await apiRequest('POST', `/api/social-media/schedule/${selectedProductId}`, {
+      return await apiRequest<{ count?: number, scheduledPosts?: any[] }>('POST', `/api/social-media/schedule/${selectedProductId}`, {
         platforms: selectedPlatforms,
         scheduledTime: scheduledDateTime.toISOString(),
         options: postFormat
       });
-      return response as { count?: number, scheduledPosts?: any[] };
     },
     onSuccess: (data: { count?: number, scheduledPosts?: any[] }) => {
       const platformCount = data?.count || data?.scheduledPosts?.length || selectedPlatforms.length;
