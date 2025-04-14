@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,10 +10,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Star, StarHalf } from "lucide-react";
+import { Star, StarHalf, MessageSquare } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import SupplierDetailModal from "./supplier-detail-modal";
 
 const SupplierComparison: React.FC = () => {
+  const { toast } = useToast();
+  const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+
   const { data: suppliers } = useQuery({
     queryKey: ['/api/suppliers/wireless-earbuds'],
     initialData: [
@@ -87,71 +93,104 @@ const SupplierComparison: React.FC = () => {
     }
   };
 
+  const handleSupplierSelect = (supplier: any) => {
+    setSelectedSupplier(supplier);
+    setModalOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setModalOpen(false);
+    setSelectedSupplier(null);
+  };
+
+  const handleContactSupplier = (supplier: any, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedSupplier(supplier);
+    setModalOpen(true);
+  };
+
   return (
-    <Card className="bg-white p-6 mb-6">
-      <h2 className="text-lg font-semibold mb-4">Top Suppliers for "Wireless Earbuds"</h2>
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader className="bg-gray-50">
-            <TableRow>
-              <TableHead>Supplier</TableHead>
-              <TableHead>Rating</TableHead>
-              <TableHead>Price</TableHead>
-              <TableHead>Min Order</TableHead>
-              <TableHead>Shipping Time</TableHead>
-              <TableHead>Return Policy</TableHead>
-              <TableHead>Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {suppliers.map((supplier) => (
-              <TableRow key={supplier.id}>
-                <TableCell>
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 h-10 w-10">
-                      <div className="h-10 w-10 rounded bg-gray-200 flex items-center justify-center text-gray-500">
-                        {supplier.name.charAt(0)}
+    <>
+      <Card className="bg-white p-6 mb-6">
+        <h2 className="text-lg font-semibold mb-4">Top Suppliers for "Wireless Earbuds"</h2>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-gray-50">
+              <TableRow>
+                <TableHead>Supplier</TableHead>
+                <TableHead>Rating</TableHead>
+                <TableHead>Price</TableHead>
+                <TableHead>Min Order</TableHead>
+                <TableHead>Shipping Time</TableHead>
+                <TableHead>Return Policy</TableHead>
+                <TableHead>Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {suppliers.map((supplier) => (
+                <TableRow 
+                  key={supplier.id} 
+                  className="cursor-pointer hover:bg-gray-50"
+                  onClick={() => handleSupplierSelect(supplier)}
+                >
+                  <TableCell>
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 h-10 w-10">
+                        <div className="h-10 w-10 rounded bg-gray-200 flex items-center justify-center text-gray-500">
+                          {supplier.name.charAt(0)}
+                        </div>
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">{supplier.name}</div>
+                        <div className="text-sm text-gray-500">{supplier.location}</div>
                       </div>
                     </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">{supplier.name}</div>
-                      <div className="text-sm text-gray-500">{supplier.location}</div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center">
+                      <div className="mr-2 flex">
+                        {renderStars(supplier.rating)}
+                      </div>
+                      <span className="text-sm text-gray-700">
+                        {supplier.rating} ({supplier.reviewCount})
+                      </span>
                     </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center">
-                    <div className="mr-2 flex">
-                      {renderStars(supplier.rating)}
-                    </div>
-                    <span className="text-sm text-gray-700">
-                      {supplier.rating} ({supplier.reviewCount})
-                    </span>
-                  </div>
-                </TableCell>
-                <TableCell className="text-sm text-gray-500">
-                  {supplier.price}
-                </TableCell>
-                <TableCell className="text-sm text-gray-500">
-                  {supplier.minOrder}
-                </TableCell>
-                <TableCell className="text-sm text-gray-500">
-                  {supplier.shippingTime}
-                </TableCell>
-                <TableCell>
-                  {getReturnPolicyBadge(supplier.returnPolicy)}
-                </TableCell>
-                <TableCell>
-                  <Button variant="link" className="text-primary-600 hover:text-primary-900">
-                    Contact
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </Card>
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-500">
+                    {supplier.price}
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-500">
+                    {supplier.minOrder}
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-500">
+                    {supplier.shippingTime}
+                  </TableCell>
+                  <TableCell>
+                    {getReturnPolicyBadge(supplier.returnPolicy)}
+                  </TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Button 
+                      variant="link" 
+                      className="text-primary-600 hover:text-primary-900 flex items-center gap-1"
+                      onClick={(e) => handleContactSupplier(supplier, e)}
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                      Contact
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+
+      <SupplierDetailModal
+        supplier={selectedSupplier}
+        open={modalOpen}
+        onClose={handleModalClose}
+      />
+    </>
   );
 };
 

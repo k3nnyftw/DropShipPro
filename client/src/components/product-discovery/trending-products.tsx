@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,8 +12,15 @@ import {
 } from "@/components/ui/table";
 import { Plus, Info, Star, StarHalf } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import ProductDetailModal from "./product-detail-modal";
 
 const TrendingProducts: React.FC = () => {
+  const { toast } = useToast();
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<"view" | "add">("view");
+
   const { data: products } = useQuery({
     queryKey: ['/api/products/trending'],
     initialData: [
@@ -102,72 +109,122 @@ const TrendingProducts: React.FC = () => {
     }
   };
 
+  const handleViewDetails = (product: any) => {
+    setSelectedProduct(product);
+    setModalMode("view");
+    setModalOpen(true);
+  };
+
+  const handleAddToStore = (product: any) => {
+    setSelectedProduct(product);
+    setModalMode("add");
+    setModalOpen(true);
+  };
+
+  const handleModalClose = () => {
+    setModalOpen(false);
+    setSelectedProduct(null);
+  };
+
+  const handleProductAdded = (product: any) => {
+    // This function is called from the modal when a product is successfully added
+    toast({
+      title: "Product added successfully",
+      description: `${product.name} has been added to your store.`,
+    });
+  };
+
   return (
-    <Card className="bg-white p-6 mb-6">
-      <h2 className="text-lg font-semibold mb-4">Trending Products</h2>
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader className="bg-gray-50">
-            <TableRow>
-              <TableHead>Product</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Trend Score</TableHead>
-              <TableHead>Est. Profit Margin</TableHead>
-              <TableHead>Competition</TableHead>
-              <TableHead>Action</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {products.map((product) => (
-              <TableRow key={product.id}>
-                <TableCell>
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 h-10 w-10">
-                      <img 
-                        className="h-10 w-10 rounded object-cover" 
-                        src={product.imageUrl} 
-                        alt={product.name} 
-                      />
-                    </div>
-                    <div className="ml-4">
-                      <div className="text-sm font-medium text-gray-900">{product.name}</div>
-                      <div className="text-sm text-gray-500">{product.searchVolume}</div>
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell className="text-sm text-gray-500">
-                  {product.category}
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center">
-                    <div className="mr-2 flex">
-                      {renderStars(product.trendScore)}
-                    </div>
-                    <span className="text-sm text-gray-700">{product.trendScore}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <span className="text-green-600 font-medium">{product.profitMargin}</span>
-                </TableCell>
-                <TableCell>
-                  {getCompetitionBadge(product.competition)}
-                </TableCell>
-                <TableCell>
-                  <div className="flex space-x-2">
-                    <Button variant="lightBlue" size="iconSm" title="Add to store">
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                    <Button variant="gray" size="iconSm" title="View details">
-                      <Info className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </TableCell>
+    <>
+      <Card className="bg-white p-6 mb-6">
+        <h2 className="text-lg font-semibold mb-4">Trending Products</h2>
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-gray-50">
+              <TableRow>
+                <TableHead>Product</TableHead>
+                <TableHead>Category</TableHead>
+                <TableHead>Trend Score</TableHead>
+                <TableHead>Est. Profit Margin</TableHead>
+                <TableHead>Competition</TableHead>
+                <TableHead>Action</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </Card>
+            </TableHeader>
+            <TableBody>
+              {products.map((product) => (
+                <TableRow key={product.id} className="cursor-pointer hover:bg-gray-50" onClick={() => handleViewDetails(product)}>
+                  <TableCell>
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 h-10 w-10">
+                        <img 
+                          className="h-10 w-10 rounded object-cover" 
+                          src={product.imageUrl} 
+                          alt={product.name} 
+                        />
+                      </div>
+                      <div className="ml-4">
+                        <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                        <div className="text-sm text-gray-500">{product.searchVolume}</div>
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm text-gray-500">
+                    {product.category}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center">
+                      <div className="mr-2 flex">
+                        {renderStars(product.trendScore)}
+                      </div>
+                      <span className="text-sm text-gray-700">{product.trendScore}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-green-600 font-medium">{product.profitMargin}</span>
+                  </TableCell>
+                  <TableCell>
+                    {getCompetitionBadge(product.competition)}
+                  </TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <div className="flex space-x-2">
+                      <Button 
+                        variant="lightBlue" 
+                        size="iconSm" 
+                        title="Add to store"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAddToStore(product);
+                        }}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="gray" 
+                        size="iconSm" 
+                        title="View details"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleViewDetails(product);
+                        }}
+                      >
+                        <Info className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
+
+      <ProductDetailModal
+        product={selectedProduct}
+        open={modalOpen}
+        onClose={handleModalClose}
+        onAddToStore={handleProductAdded}
+      />
+    </>
   );
 };
 
