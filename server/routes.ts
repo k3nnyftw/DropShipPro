@@ -7,6 +7,7 @@ import paymentRoutes from "./routes/payment";
 import aiAnalyticsRoutes from "./routes/ai-analytics";
 import priceOptimizerRoutes from "./routes/price-optimizer";
 import orderFulfillmentRoutes from "./routes/order-fulfillment";
+import inventoryManagerRoutes from "./routes/inventory-manager";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register route modules
@@ -14,6 +15,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/ai-analytics', aiAnalyticsRoutes);
   app.use('/api/price-optimizer', priceOptimizerRoutes);
   app.use('/api/fulfillment', orderFulfillmentRoutes);
+  app.use('/api/inventory', inventoryManagerRoutes);
   
   // prefix all routes with /api
   
