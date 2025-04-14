@@ -237,7 +237,7 @@ const ProductDetailDialog: React.FC<ProductDetailDialogProps> = ({
             </div>
           ) : (
             <CheckoutPayment 
-              amount={product.price * 100} // Convert to cents for Stripe
+              amount={product.price} // Pass price in dollars
               orderId={product.id}
               onPaymentComplete={handlePaymentComplete}
             />
