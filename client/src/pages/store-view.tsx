@@ -8,37 +8,11 @@ import ProductCard from "@/components/store/product-card";
 import { StoreThemeEditor, ThemeOptions } from "@/components/store/theme-editor";
 import { useQuery } from "@tanstack/react-query";
 import { Eye, Palette, ExternalLink } from "lucide-react";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const StoreView: React.FC = () => {
   const [themeEditorOpen, setThemeEditorOpen] = useState(false);
-  const [currentTheme, setCurrentTheme] = useState<ThemeOptions>({
-    colors: {
-      primary: '#3b82f6',
-      secondary: '#6366f1',
-      accent: '#f43f5e',
-      background: '#ffffff',
-      text: '#374151',
-    },
-    typography: {
-      headingFont: 'Inter',
-      bodyFont: 'Inter',
-      baseSize: 16,
-    },
-    layout: {
-      contentWidth: 1200,
-      spacing: 16,
-      borderRadius: 8,
-    },
-    header: {
-      style: 'modern',
-      showSearch: true,
-    },
-    footer: {
-      columns: 3,
-      showSocial: true,
-    },
-  });
-  
+  const { theme, updateTheme } = useTheme();
   const { toast } = useToast();
   
   const { data: products } = useQuery({
@@ -87,9 +61,11 @@ const StoreView: React.FC = () => {
     ]
   });
 
-  const handleThemeSave = (theme: ThemeOptions) => {
-    setCurrentTheme(theme);
-    // In a real app, we would save this to the backend
+  const handleThemeSave = (newTheme: ThemeOptions) => {
+    // Update the theme using our context
+    updateTheme(newTheme);
+    
+    // Show success message
     toast({
       title: "Theme updated",
       description: "Your store theme has been successfully updated."
@@ -132,8 +108,8 @@ const StoreView: React.FC = () => {
       <Card 
         className="bg-white rounded-lg shadow-sm overflow-hidden"
         style={{
-          backgroundColor: currentTheme.colors.background,
-          borderRadius: `${currentTheme.layout.borderRadius}px`
+          backgroundColor: theme.colors.background,
+          borderRadius: `${theme.layout.borderRadius}px`
         }}
       >
         <StoreHeader />
@@ -143,15 +119,15 @@ const StoreView: React.FC = () => {
         <div 
           className="container mx-auto py-8 px-4"
           style={{
-            maxWidth: `${currentTheme.layout.contentWidth}px`,
-            padding: `${currentTheme.layout.spacing}px`,
+            maxWidth: `${theme.layout.contentWidth}px`,
+            padding: `${theme.layout.spacing}px`,
           }}
         >
           <h2 
             className="text-2xl font-bold mb-6"
             style={{
-              color: currentTheme.colors.text,
-              fontFamily: currentTheme.typography.headingFont
+              color: theme.colors.text,
+              fontFamily: theme.typography.headingFont
             }}
           >
             Featured Products
@@ -159,7 +135,7 @@ const StoreView: React.FC = () => {
           <div 
             className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
             style={{
-              gap: `${currentTheme.layout.spacing}px`
+              gap: `${theme.layout.spacing}px`
             }}
           >
             {products.map(product => (
@@ -173,8 +149,8 @@ const StoreView: React.FC = () => {
             <Button 
               variant="outline"
               style={{
-                borderColor: currentTheme.colors.primary,
-                color: currentTheme.colors.primary
+                borderColor: theme.colors.primary,
+                color: theme.colors.primary
               }}
             >
               <Eye className="mr-2 h-4 w-4" />
@@ -188,7 +164,7 @@ const StoreView: React.FC = () => {
       <StoreThemeEditor
         open={themeEditorOpen}
         onOpenChange={setThemeEditorOpen}
-        initialTheme={currentTheme}
+        initialTheme={theme}
         onSave={handleThemeSave}
       />
     </>

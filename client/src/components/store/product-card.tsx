@@ -5,6 +5,7 @@ import { ShoppingCart, Star, StarHalf, Eye } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import ProductDetailDialog from "./product-detail-dialog";
+import { useTheme } from "@/contexts/ThemeContext";
 
 interface ProductCardProps {
   product: {
@@ -26,6 +27,7 @@ interface ProductCardProps {
 const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
   const { toast } = useToast();
   const [modalOpen, setModalOpen] = useState(false);
+  const { theme } = useTheme();
 
   const renderStars = (rating: number) => {
     const stars = [];
@@ -60,10 +62,46 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
     setModalOpen(true);
   };
 
+  // Apply theme styles
+  const cardStyle = {
+    backgroundColor: theme.colors.background,
+    borderRadius: `${theme.layout.borderRadius}px`,
+    fontFamily: theme.typography.bodyFont,
+  };
+
+  const titleStyle = {
+    color: theme.colors.text,
+    fontFamily: theme.typography.headingFont,
+  };
+
+  const descriptionStyle = {
+    color: theme.colors.text,
+    opacity: 0.7,
+  };
+
+  const priceStyle = {
+    color: theme.colors.primary,
+    fontFamily: theme.typography.headingFont,
+    fontWeight: 'bold' as const,
+  };
+
+  const buttonStyle = {
+    backgroundColor: theme.colors.primary,
+    color: '#ffffff',
+    borderRadius: `${theme.layout.borderRadius * 2}px`,
+  };
+
   return (
     <>
-      <div className="group cursor-pointer" onClick={handleViewDetails}>
-        <div className="relative overflow-hidden rounded-lg bg-gray-100">
+      <div 
+        className="group cursor-pointer" 
+        onClick={handleViewDetails}
+        style={cardStyle}
+      >
+        <div 
+          className="relative overflow-hidden bg-gray-100"
+          style={{ borderRadius: `${theme.layout.borderRadius}px` }}
+        >
           <img 
             src={product.imageUrl}
             alt={product.name} 
@@ -73,49 +111,79 @@ const ProductCard: React.FC<ProductCardProps> = ({ product }) => {
             <Button 
               variant="default" 
               size="icon"
-              className="bg-white text-gray-800 rounded-full p-3 transform translate-y-10 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300"
+              className="p-3 transform translate-y-10 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300"
               onClick={handleAddToCart}
+              style={buttonStyle}
             >
               <ShoppingCart className="h-5 w-5" />
             </Button>
             <Button 
               variant="default" 
               size="icon"
-              className="bg-white text-gray-800 rounded-full p-3 transform translate-y-10 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 delay-75"
+              className="p-3 transform translate-y-10 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300 delay-75"
               onClick={(e) => {
                 e.stopPropagation();
                 handleViewDetails();
               }}
+              style={buttonStyle}
             >
               <Eye className="h-5 w-5" />
             </Button>
           </div>
           {product.isNew && (
             <div className="absolute top-2 right-2">
-              <Badge variant="info">New</Badge>
+              <Badge 
+                variant="info"
+                style={{ 
+                  backgroundColor: theme.colors.secondary,
+                  color: '#ffffff',
+                  borderRadius: `${theme.layout.borderRadius}px` 
+                }}
+              >
+                New
+              </Badge>
             </div>
           )}
           {product.isOnSale && (
             <div className="absolute top-2 right-2">
-              <Badge variant="danger">-20%</Badge>
+              <Badge 
+                variant="danger"
+                style={{ 
+                  backgroundColor: theme.colors.accent,
+                  color: '#ffffff',
+                  borderRadius: `${theme.layout.borderRadius}px` 
+                }}
+              >
+                -20%
+              </Badge>
             </div>
           )}
         </div>
         <div className="pt-4">
-          <h3 className="text-lg font-medium text-gray-900">{product.name}</h3>
-          <p className="text-gray-500 text-sm mb-2 line-clamp-2">{product.description}</p>
+          <h3 
+            className="text-lg font-medium"
+            style={titleStyle}
+          >
+            {product.name}
+          </h3>
+          <p 
+            className="text-sm mb-2 line-clamp-2"
+            style={descriptionStyle}
+          >
+            {product.description}
+          </p>
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-gray-900 font-bold">{formatCurrency(product.price)}</span>
+              <span style={priceStyle}>{formatCurrency(product.price)}</span>
               {product.salePrice && (
-                <span className="text-gray-500 line-through text-sm ml-2">
+                <span className="line-through text-sm ml-2" style={descriptionStyle}>
                   {formatCurrency(product.salePrice)}
                 </span>
               )}
             </div>
             <div className="flex text-yellow-400 items-center">
               {renderStars(product.rating)}
-              <span className="text-gray-500 text-sm ml-1">({product.reviewCount})</span>
+              <span className="text-sm ml-1" style={descriptionStyle}>({product.reviewCount})</span>
             </div>
           </div>
         </div>

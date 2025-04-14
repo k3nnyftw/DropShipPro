@@ -8,12 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { useTheme } from "@/contexts/ThemeContext";
 
 const StoreHeader: React.FC = () => {
   const [location, navigate] = useLocation();
   const [searchOpen, setSearchOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
+  const { theme } = useTheme();
   
   // Mock cart items
   const cartItems = [
@@ -28,10 +30,34 @@ const StoreHeader: React.FC = () => {
     navigate(path);
   };
   
+  // Apply theme styles
+  const headerStyle = {
+    backgroundColor: theme.colors.primary,
+    color: '#ffffff', 
+    padding: `${theme.layout.spacing / 2}px ${theme.layout.spacing}px`
+  };
+
+  const logoStyle = {
+    fontFamily: theme.typography.headingFont,
+    fontWeight: 'bold'
+  };
+  
+  const buttonStyle = {
+    color: '#ffffff',
+    fontFamily: theme.typography.bodyFont
+  };
+  
   return (
-    <div className="bg-gray-800 text-white p-4">
-      <div className="container mx-auto flex justify-between items-center">
-        <div className="text-xl font-bold cursor-pointer" onClick={() => handleNavigate("/store")}>
+    <div style={headerStyle}>
+      <div 
+        className="container mx-auto flex justify-between items-center"
+        style={{ maxWidth: `${theme.layout.contentWidth}px` }}
+      >
+        <div 
+          className="text-xl font-bold cursor-pointer" 
+          onClick={() => handleNavigate("/store")}
+          style={logoStyle}
+        >
           YourStoreName
         </div>
         
@@ -41,6 +67,7 @@ const StoreHeader: React.FC = () => {
             variant="link" 
             className="text-white hover:text-gray-300 p-0"
             onClick={() => handleNavigate("/store")}
+            style={buttonStyle}
           >
             <Home className="w-4 h-4 mr-1" />
             Home
@@ -49,6 +76,7 @@ const StoreHeader: React.FC = () => {
             variant="link" 
             className="text-white hover:text-gray-300 p-0"
             onClick={() => handleNavigate("/store?category=all")}
+            style={buttonStyle}
           >
             <TagIcon className="w-4 h-4 mr-1" />
             Shop
@@ -57,6 +85,7 @@ const StoreHeader: React.FC = () => {
             variant="link" 
             className="text-white hover:text-gray-300 p-0"
             onClick={() => handleNavigate("/store?view=collections")}
+            style={buttonStyle}
           >
             <Grid3X3 className="w-4 h-4 mr-1" />
             Collections
@@ -65,6 +94,7 @@ const StoreHeader: React.FC = () => {
             variant="link" 
             className="text-white hover:text-gray-300 p-0"
             onClick={() => handleNavigate("/store?page=about")}
+            style={buttonStyle}
           >
             <Info className="w-4 h-4 mr-1" />
             About
@@ -73,6 +103,7 @@ const StoreHeader: React.FC = () => {
             variant="link" 
             className="text-white hover:text-gray-300 p-0"
             onClick={() => handleNavigate("/store?page=contact")}
+            style={buttonStyle}
           >
             <Phone className="w-4 h-4 mr-1" />
             Contact
@@ -87,7 +118,7 @@ const StoreHeader: React.FC = () => {
                 <Menu className="w-5 h-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-72">
+            <SheetContent side="left" className="w-72" style={{ fontFamily: theme.typography.bodyFont }}>
               <div className="py-6 flex flex-col space-y-4">
                 <Button 
                   variant="ghost" 
@@ -161,7 +192,13 @@ const StoreHeader: React.FC = () => {
             onClick={() => setCartOpen(true)}
           >
             <ShoppingCart className="w-5 h-5" />
-            <span className="absolute -top-1 -right-1 bg-primary text-xs text-white rounded-full w-4 h-4 flex items-center justify-center">
+            <span 
+              className="absolute -top-1 -right-1 text-xs text-white rounded-full w-4 h-4 flex items-center justify-center"
+              style={{ 
+                backgroundColor: theme.colors.accent,
+                borderRadius: `${theme.layout.borderRadius}px` 
+              }}
+            >
               {cartItems.length}
             </span>
           </Button>
@@ -170,18 +207,27 @@ const StoreHeader: React.FC = () => {
       
       {/* Search Modal */}
       <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" style={{ fontFamily: theme.typography.bodyFont }}>
           <DialogHeader>
-            <DialogTitle>Search products</DialogTitle>
+            <DialogTitle style={{ fontFamily: theme.typography.headingFont }}>Search products</DialogTitle>
           </DialogHeader>
           <div className="flex items-center space-x-2">
             <div className="grid flex-1 gap-2">
               <Input
                 placeholder="What are you looking for?"
                 className="col-span-3"
+                style={{ borderRadius: `${theme.layout.borderRadius}px` }}
               />
             </div>
-            <Button type="submit">Search</Button>
+            <Button 
+              type="submit"
+              style={{ 
+                backgroundColor: theme.colors.primary,
+                borderRadius: `${theme.layout.borderRadius}px` 
+              }}
+            >
+              Search
+            </Button>
           </div>
           <DialogFooter className="sm:justify-start">
             <div className="text-sm text-muted-foreground">
@@ -193,9 +239,9 @@ const StoreHeader: React.FC = () => {
       
       {/* Cart Drawer */}
       <Dialog open={cartOpen} onOpenChange={setCartOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" style={{ fontFamily: theme.typography.bodyFont }}>
           <DialogHeader>
-            <DialogTitle>Your Shopping Cart</DialogTitle>
+            <DialogTitle style={{ fontFamily: theme.typography.headingFont }}>Your Shopping Cart</DialogTitle>
           </DialogHeader>
           
           {cartItems.length > 0 ? (
@@ -229,6 +275,10 @@ const StoreHeader: React.FC = () => {
                     setCartOpen(false);
                     navigate("/store?page=checkout");
                   }}
+                  style={{ 
+                    backgroundColor: theme.colors.primary,
+                    borderRadius: `${theme.layout.borderRadius}px` 
+                  }}
                 >
                   Checkout
                 </Button>
@@ -245,6 +295,11 @@ const StoreHeader: React.FC = () => {
                   setCartOpen(false);
                   navigate("/store?category=all");
                 }}
+                style={{ 
+                  borderColor: theme.colors.primary,
+                  color: theme.colors.primary,
+                  borderRadius: `${theme.layout.borderRadius}px` 
+                }}
               >
                 Continue Shopping
               </Button>
@@ -255,9 +310,9 @@ const StoreHeader: React.FC = () => {
       
       {/* Account Modal */}
       <Dialog open={accountOpen} onOpenChange={setAccountOpen}>
-        <DialogContent>
+        <DialogContent style={{ fontFamily: theme.typography.bodyFont }}>
           <DialogHeader>
-            <DialogTitle>Your Account</DialogTitle>
+            <DialogTitle style={{ fontFamily: theme.typography.headingFont }}>Your Account</DialogTitle>
           </DialogHeader>
           
           <div className="grid gap-4 py-4">
@@ -268,6 +323,10 @@ const StoreHeader: React.FC = () => {
               }}
               variant="outline"
               className="justify-start"
+              style={{ 
+                borderRadius: `${theme.layout.borderRadius}px`,
+                borderColor: theme.colors.secondary 
+              }}
             >
               <Package className="mr-2 h-4 w-4" />
               Your Orders
@@ -280,6 +339,10 @@ const StoreHeader: React.FC = () => {
               }}
               variant="outline"
               className="justify-start"
+              style={{ 
+                borderRadius: `${theme.layout.borderRadius}px`,
+                borderColor: theme.colors.secondary 
+              }}
             >
               <Heart className="mr-2 h-4 w-4" />
               Wishlist
@@ -292,6 +355,10 @@ const StoreHeader: React.FC = () => {
               }}
               variant="outline"
               className="justify-start"
+              style={{ 
+                borderRadius: `${theme.layout.borderRadius}px`,
+                borderColor: theme.colors.secondary 
+              }}
             >
               <User className="mr-2 h-4 w-4" />
               Profile Settings
@@ -299,7 +366,14 @@ const StoreHeader: React.FC = () => {
           </div>
           
           <DialogFooter>
-            <Button className="w-full" variant="default">
+            <Button 
+              className="w-full" 
+              variant="default"
+              style={{ 
+                backgroundColor: theme.colors.primary,
+                borderRadius: `${theme.layout.borderRadius}px` 
+              }}
+            >
               Sign In
             </Button>
           </DialogFooter>
