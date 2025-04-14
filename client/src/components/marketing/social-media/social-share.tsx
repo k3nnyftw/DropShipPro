@@ -482,7 +482,9 @@ export default function SocialShare() {
   // Get current product
   const getCurrentProduct = () => {
     if (!productsQuery.data || !selectedProductId) return null;
-    return productsQuery.data.find((p: any) => p.id === selectedProductId);
+    return productsQuery.data && Array.isArray(productsQuery.data) 
+      ? productsQuery.data.find((p: any) => p.id === selectedProductId) 
+      : null;
   };
 
   // Loading state
