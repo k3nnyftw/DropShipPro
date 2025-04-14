@@ -369,6 +369,22 @@ const SupplierDetailModal: React.FC<SupplierDetailModalProps> = ({
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
+          {supplier.website && (
+            <Button 
+              variant="outline"
+              className="gap-2 bg-amber-50 border-amber-200 hover:bg-amber-100 text-amber-700"
+              onClick={() => {
+                window.open(supplier.website, '_blank', 'noopener,noreferrer');
+                toast({
+                  title: "Opening supplier website",
+                  description: "The supplier's website is opening in a new tab."
+                });
+              }}
+            >
+              <ExternalLink className="h-4 w-4" />
+              Visit Website
+            </Button>
+          )}
           <Button 
             variant="outline"
             className="gap-2"

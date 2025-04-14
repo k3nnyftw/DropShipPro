@@ -38,6 +38,7 @@ export const suppliers = pgTable("suppliers", {
   minOrder: integer("min_order"),
   shippingTime: text("shipping_time"),
   returnPolicy: text("return_policy"),
+  website: text("website"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -111,6 +112,7 @@ export const insertSupplierSchema = createInsertSchema(suppliers).pick({
   minOrder: true,
   shippingTime: true,
   returnPolicy: true,
+  website: true,
 });
 
 export const insertOrderSchema = createInsertSchema(orders).pick({
