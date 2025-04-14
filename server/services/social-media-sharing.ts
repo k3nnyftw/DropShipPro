@@ -7,6 +7,7 @@
  * 3. Scheduling of social media posts
  * 4. Performance tracking
  * 5. Hashtag optimization
+ * 6. Social account connection and management
  */
 
 import { storage } from "../storage";
@@ -76,6 +77,19 @@ export interface SharingResult {
   postId?: string;
   postUrl?: string;
   message?: string;
+}
+
+// Social media account
+export interface SocialAccount {
+  id: number;
+  platform: string;
+  username: string;
+  connected: boolean;
+  followers?: number;
+  lastPostDate?: Date;
+  status: 'active' | 'pending' | 'error';
+  error?: string;
+  createdAt: Date;
 }
 
 /**
@@ -1109,4 +1123,144 @@ export async function getOptimalPostingTimes(): Promise<{
       ]
     }
   ];
+}
+
+/**
+ * Get all connected social media accounts
+ * @returns Promise resolving to array of connected social accounts
+ */
+export async function getConnectedAccounts(): Promise<SocialAccount[]> {
+  // In a real implementation, this would fetch from a database
+  // For demo purposes, returning sample accounts
+  
+  return [
+    {
+      id: 1,
+      platform: SocialPlatform.FACEBOOK,
+      username: 'yourstorebusiness',
+      connected: true,
+      followers: 2450,
+      lastPostDate: new Date('2023-04-08'),
+      status: 'active',
+      createdAt: new Date('2023-01-15')
+    },
+    {
+      id: 2,
+      platform: SocialPlatform.INSTAGRAM,
+      username: 'yourstore_official',
+      connected: true,
+      followers: 5680,
+      lastPostDate: new Date('2023-04-10'),
+      status: 'active',
+      createdAt: new Date('2023-01-20')
+    },
+    {
+      id: 3,
+      platform: SocialPlatform.TWITTER,
+      username: 'YourStore',
+      connected: true,
+      followers: 1890,
+      lastPostDate: new Date('2023-04-09'),
+      status: 'active',
+      createdAt: new Date('2023-02-05')
+    },
+    {
+      id: 4,
+      platform: SocialPlatform.PINTEREST,
+      username: 'yourstoreofficial',
+      connected: false,
+      status: 'error',
+      error: 'Authentication token expired',
+      createdAt: new Date('2023-03-10')
+    }
+  ];
+}
+
+/**
+ * Connect a new social media account
+ * @param accountData The social account data to connect
+ * @returns Promise resolving to the connected social account
+ */
+export async function connectSocialAccount(accountData: {
+  platform: string;
+  username: string;
+  accessToken?: string;
+}): Promise<SocialAccount> {
+  // In a real implementation, this would validate the credentials with the social platform
+  // and save the connection details to a database
+  
+  const { platform, username, accessToken } = accountData;
+  
+  // Simulate account validation with the platform API
+  // For demo purposes, we'll assume success except for specific test cases
+  
+  // Test case for error when connecting TikTok without a token
+  if (platform === 'tiktok' && !accessToken) {
+    throw new Error('TikTok requires an access token for API integration');
+  }
+  
+  // Create the new account with default values
+  const newAccount: SocialAccount = {
+    id: Math.floor(Math.random() * 10000),
+    platform,
+    username,
+    connected: true,
+    followers: 0, // Will be updated after syncing with the platform
+    status: 'active',
+    createdAt: new Date()
+  };
+  
+  return newAccount;
+}
+
+/**
+ * Update social media account status (active/inactive)
+ * @param accountId The ID of the account to update
+ * @param active Whether the account should be active or not
+ * @returns Promise resolving to the updated social account
+ */
+export async function updateSocialAccountStatus(
+  accountId: number,
+  active: boolean
+): Promise<SocialAccount> {
+  // In a real implementation, this would fetch the account from a database,
+  // update its status, and potentially update API endpoints
+  
+  // For demo purposes, we'll just fetch our mock account and update it
+  const accounts = await getConnectedAccounts();
+  const account = accounts.find(acc => acc.id === accountId);
+  
+  if (!account) {
+    throw new Error(`Social media account with ID ${accountId} not found`);
+  }
+  
+  const updatedAccount: SocialAccount = {
+    ...account,
+    connected: active,
+    status: active ? 'active' : 'pending'
+  };
+  
+  return updatedAccount;
+}
+
+/**
+ * Disconnect a social media account
+ * @param accountId The ID of the account to disconnect
+ * @returns Promise resolving to void on success
+ */
+export async function disconnectSocialAccount(accountId: number): Promise<void> {
+  // In a real implementation, this would remove the account from the database
+  // and potentially revoke API access
+  
+  // For demo purposes, we'll just check if the account exists
+  const accounts = await getConnectedAccounts();
+  const account = accounts.find(acc => acc.id === accountId);
+  
+  if (!account) {
+    throw new Error(`Social media account with ID ${accountId} not found`);
+  }
+  
+  // In a real implementation, this would actually delete or deactivate the account
+  // For the demo, we'll return successfully
+  return;
 }
