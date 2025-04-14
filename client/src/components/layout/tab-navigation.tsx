@@ -10,7 +10,8 @@ const TabNavigation: React.FC = () => {
     { name: "Product Discovery", path: "/product-discovery" },
     { name: "Supplier Analysis", path: "/supplier-analysis" },
     { name: "Advertising", path: "/advertising" },
-    { name: "Orders", path: "/orders" }
+    { name: "Orders", path: "/orders" },
+    { name: "Automation", path: "/automation" }
   ];
 
   return (

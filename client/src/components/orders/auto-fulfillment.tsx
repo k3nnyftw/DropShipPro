@@ -1,80 +1,125 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { 
-  Package, 
-  TruckIcon, 
+  Truck, 
+  ShoppingBag, 
+  PackageCheck, 
   Clock, 
-  CheckCircle2, 
   AlertCircle, 
   Loader2,
-  BarChart4,
-  Settings,
+  ArrowUpRight,
   Sparkles,
-  ExternalLink,
-  CalendarClock
+  BarChart3,
+  Settings,
+  RefreshCw
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
-import { formatDate } from '@/lib/utils';
 
 export function AutoFulfillment() {
   const [autoFulfill, setAutoFulfill] = useState(false);
-  const [activeTab, setActiveTab] = useState('pending');
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch all orders
-  const ordersQuery = useQuery({
-    queryKey: ['/api/orders'],
+  // Fetch pending orders
+  const pendingOrdersQuery = useQuery({
+    queryKey: ['/api/fulfillment/pending'],
     queryFn: async () => {
       const response = await fetch('/api/orders');
       if (!response.ok) {
-        throw new Error('Failed to fetch orders');
+        throw new Error('Failed to fetch pending orders');
       }
-      return response.json();
+      const orders = await response.json();
+      // Filter orders that are pending fulfillment
+      return orders.filter((order: any) => 
+        order.status === 'processing' || 
+        order.status === 'paid' || 
+        (order.paymentStatus === 'paid' && order.fulfillment !== 'shipped')
+      );
     }
   });
 
-  // Mutation for auto-fulfilling pending orders
+  // Fetch fulfillment stats
+  const fulfillmentStatsQuery = useQuery({
+    queryKey: ['/api/fulfillment/stats'],
+    queryFn: async () => {
+      // In a real app, this would come from the API
+      return {
+        pendingOrders: pendingOrdersQuery.data?.length || 0,
+        autoFulfilled: 18,
+        totalOrders: 42,
+        averageFulfillmentTime: '1.3 days',
+        successRate: 97.5,
+      };
+    },
+    enabled: !!pendingOrdersQuery.data
+  });
+
+  // Mutation for manual fulfillment
+  const fulfillOrderMutation = useMutation({
+    mutationFn: (orderId: number) => {
+      return apiRequest('POST', `/api/fulfillment/fulfill/${orderId}`, {});
+    },
+    onSuccess: (_, orderId) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/fulfillment/pending'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      toast({
+        title: "Order Fulfilled",
+        description: `Order #${orderId} has been sent to the supplier for fulfillment.`,
+      });
+    },
+    onError: (error, orderId) => {
+      console.error(`Error fulfilling order ${orderId}:`, error);
+      toast({
+        title: "Fulfillment Failed",
+        description: "There was an error fulfilling the order. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Mutation for auto-fulfillment
   const autoFulfillMutation = useMutation({
     mutationFn: () => {
       return apiRequest('POST', '/api/fulfillment/auto-fulfill', {});
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/fulfillment/pending'] });
       queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      const successCount = data?.successCount || 0;
       toast({
-        title: "Orders Auto-Fulfilled",
-        description: "Pending orders have been automatically sent to suppliers for fulfillment.",
+        title: "Auto-Fulfillment Complete",
+        description: `Successfully fulfilled ${successCount} orders automatically.`,
       });
     },
     onError: (error) => {
       console.error('Error auto-fulfilling orders:', error);
       toast({
         title: "Auto-Fulfillment Failed",
-        description: "There was an error processing the automatic order fulfillment. Please try again.",
+        description: "There was an error fulfilling orders automatically. Please try again.",
         variant: "destructive",
       });
     }
   });
 
   // Mutation for scheduling automatic fulfillment
-  const scheduleAutoFulfillMutation = useMutation({
-    mutationFn: (intervalMinutes: number) => {
+  const scheduleFulfillmentMutation = useMutation({
+    mutationFn: (intervalHours: number) => {
       return apiRequest('POST', '/api/fulfillment/schedule', {
-        intervalMinutes
+        intervalHours
       });
     },
     onSuccess: () => {
       toast({
         title: "Automatic Fulfillment Enabled",
-        description: "New orders will be automatically fulfilled as they come in.",
+        description: "Orders will be automatically fulfilled when payment is received.",
       });
     },
     onError: (error) => {
@@ -88,182 +133,41 @@ export function AutoFulfillment() {
     }
   });
 
-  // Manually trigger auto-fulfillment for pending orders
-  const handleAutoFulfill = () => {
-    autoFulfillMutation.mutate();
-  };
-
-  // Toggle automatic fulfillment
+  // Handle toggling automatic fulfillment
   const handleAutoFulfillToggle = (checked: boolean) => {
     setAutoFulfill(checked);
     if (checked) {
-      scheduleAutoFulfillMutation.mutate(15); // Schedule every 15 minutes
+      scheduleFulfillmentMutation.mutate(1); // Check every hour
     }
   };
 
-  // Filter orders by fulfillment status
-  const getFilteredOrders = (status: string) => {
-    if (!ordersQuery.data) return [];
-    
-    return ordersQuery.data.filter((order: any) => {
-      if (status === 'pending') {
-        return order.status === 'confirmed' && 
-               order.paymentStatus === 'paid' && 
-               (!order.fulfillment || order.fulfillment === 'pending');
-      } else if (status === 'processing') {
-        return order.fulfillment === 'processing';
-      } else if (status === 'shipped') {
-        return order.fulfillment === 'shipped';
-      } else if (status === 'delivered') {
-        return order.fulfillment === 'delivered';
-      }
-      return false;
-    });
-  };
-
-  // Generate tracking information cards
-  const renderTrackingInfo = (order: any) => {
-    // Track the order from the API
-    const [trackingInfo, setTrackingInfo] = useState<any>(null);
-    const [trackingError, setTrackingError] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
-    
-    const fetchTracking = async () => {
-      setLoading(true);
-      setTrackingError(null);
-      
-      try {
-        const response = await fetch(`/api/fulfillment/track/${order.id}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch tracking information');
-        }
-        
-        const data = await response.json();
-        setTrackingInfo(data);
-      } catch (error) {
-        setTrackingError('Could not retrieve tracking information');
-        console.error('Error fetching tracking:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    if (!trackingInfo && !loading && !trackingError) {
-      return (
-        <div className="flex justify-center mt-2">
-          <Button variant="outline" size="sm" onClick={fetchTracking}>
-            <Package className="h-4 w-4 mr-2" />
-            Track Order
-          </Button>
-        </div>
-      );
-    }
-    
-    if (loading) {
-      return (
-        <div className="flex justify-center mt-2">
-          <Loader2 className="h-5 w-5 animate-spin text-primary" />
-        </div>
-      );
-    }
-    
-    if (trackingError) {
-      return (
-        <div className="text-center mt-2 text-sm text-muted-foreground">
-          <AlertCircle className="h-4 w-4 inline-block mr-1 text-yellow-500" />
-          {trackingError}
-        </div>
-      );
-    }
-    
-    return (
-      <div className="mt-3 space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">Status:</span>
-          <Badge 
-            variant={
-              trackingInfo.status === 'delivered' 
-                ? 'success' 
-                : trackingInfo.status === 'shipped' 
-                ? 'default' 
-                : 'outline'
-            }
-          >
-            {trackingInfo.status.charAt(0).toUpperCase() + trackingInfo.status.slice(1)}
-          </Badge>
-        </div>
-        
-        {trackingInfo.supplierUpdates && trackingInfo.supplierUpdates.length > 0 && (
-          <div className="space-y-2">
-            {trackingInfo.supplierUpdates.map((update: any, index: number) => (
-              <div key={index} className="border rounded-md p-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="font-medium">{update.supplierName}</span>
-                  <Badge variant="outline" className="text-xs">
-                    {update.status}
-                  </Badge>
-                </div>
-                {update.trackingNumber && (
-                  <div className="mt-1 flex justify-between">
-                    <span className="text-muted-foreground">Tracking:</span>
-                    <span className="font-mono">{update.trackingNumber}</span>
-                  </div>
-                )}
-                {update.estimatedDelivery && (
-                  <div className="mt-1 flex justify-between">
-                    <span className="text-muted-foreground">Est. Delivery:</span>
-                    <span>{formatDate(update.estimatedDelivery)}</span>
-                  </div>
-                )}
-                {update.trackingUrl && (
-                  <Button 
-                    variant="link" 
-                    size="sm" 
-                    className="mt-1 h-auto p-0 text-xs"
-                    onClick={() => window.open(update.trackingUrl, '_blank')}
-                  >
-                    Track Package <ExternalLink className="h-3 w-3 ml-1" />
-                  </Button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // Generate status badge
+  // Get status badge
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'processing':
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Processing</Badge>;
+        return <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">Processing</Badge>;
+      case 'paid':
+        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Paid</Badge>;
       case 'shipped':
-        return <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">Shipped</Badge>;
+        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Shipped</Badge>;
       case 'delivered':
-        return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Delivered</Badge>;
+        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Delivered</Badge>;
       default:
-        return <Badge variant="outline">Pending</Badge>;
+        return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100">{status}</Badge>;
     }
   };
 
-  // Get list of orders by status
-  const pendingOrders = getFilteredOrders('pending');
-  const processingOrders = getFilteredOrders('processing');
-  const shippedOrders = getFilteredOrders('shipped');
-  const deliveredOrders = getFilteredOrders('delivered');
-
   // Loading state
-  if (ordersQuery.isLoading) {
+  if (pendingOrdersQuery.isLoading) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TruckIcon className="h-5 w-5" />
+            <Truck className="h-5 w-5" />
             Automated Order Fulfillment
           </CardTitle>
           <CardDescription>
-            Loading order fulfillment data...
+            Loading order data...
           </CardDescription>
         </CardHeader>
         <CardContent className="flex justify-center py-12">
@@ -274,12 +178,12 @@ export function AutoFulfillment() {
   }
 
   // Error state
-  if (ordersQuery.isError) {
+  if (pendingOrdersQuery.isError) {
     return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TruckIcon className="h-5 w-5" />
+            <Truck className="h-5 w-5" />
             Automated Order Fulfillment
           </CardTitle>
           <CardDescription>
@@ -287,14 +191,16 @@ export function AutoFulfillment() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-12">
-            <AlertCircle className="h-10 w-10 text-red-500 mx-auto mb-4" />
+          <div className="text-center py-8">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <p className="text-muted-foreground">
-              There was an error loading order data. Please try again.
+              There was an error loading the orders data. Please try again.
             </p>
             <Button 
               className="mt-4"
-              onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/orders'] })}
+              onClick={() => {
+                queryClient.invalidateQueries({ queryKey: ['/api/fulfillment/pending'] });
+              }}
             >
               Retry
             </Button>
@@ -304,86 +210,95 @@ export function AutoFulfillment() {
     );
   }
 
+  const pendingOrders = pendingOrdersQuery.data || [];
+  const stats = fulfillmentStatsQuery.data || {
+    pendingOrders: pendingOrders.length,
+    autoFulfilled: 0,
+    totalOrders: 0,
+    averageFulfillmentTime: 'N/A',
+    successRate: 0,
+  };
+  
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TruckIcon className="h-5 w-5" />
+            <Truck className="h-5 w-5" />
             Automated Order Fulfillment
           </CardTitle>
           <CardDescription>
-            Automate the fulfillment process by sending orders directly to suppliers
+            Automatically fulfill orders with suppliers as soon as payments are received
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             {/* Fulfillment Stats */}
             <Card className="bg-muted/50">
               <CardHeader className="p-4 pb-2">
                 <CardTitle className="text-base flex items-center gap-1.5">
-                  <BarChart4 className="h-4 w-4" />
-                  Order Statistics
+                  <BarChart3 className="h-4 w-4" />
+                  Fulfillment Overview
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4">
                 <dl className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <dt className="text-sm text-muted-foreground">Pending Fulfillment:</dt>
-                    <dd className="font-medium">{pendingOrders.length}</dd>
+                    <dt className="text-sm text-muted-foreground">Pending Orders:</dt>
+                    <dd className="font-medium">{stats.pendingOrders}</dd>
                   </div>
                   <div className="flex items-center justify-between">
-                    <dt className="text-sm text-muted-foreground">Processing:</dt>
-                    <dd className="font-medium">{processingOrders.length}</dd>
+                    <dt className="text-sm text-muted-foreground">Auto-Fulfilled:</dt>
+                    <dd className="font-medium">{stats.autoFulfilled}</dd>
                   </div>
                   <div className="flex items-center justify-between">
-                    <dt className="text-sm text-muted-foreground">Shipped:</dt>
-                    <dd className="font-medium">{shippedOrders.length}</dd>
+                    <dt className="text-sm text-muted-foreground">Average Time:</dt>
+                    <dd className="font-medium">{stats.averageFulfillmentTime}</dd>
                   </div>
                   <div className="flex items-center justify-between">
-                    <dt className="text-sm text-muted-foreground">Delivered:</dt>
-                    <dd className="font-medium">{deliveredOrders.length}</dd>
+                    <dt className="text-sm text-muted-foreground">Success Rate:</dt>
+                    <dd className="font-medium">{stats.successRate}%</dd>
                   </div>
                 </dl>
               </CardContent>
             </Card>
 
-            {/* Manual Fulfillment Controls */}
+            {/* Manual Fulfillment */}
             <Card className="bg-muted/50">
               <CardHeader className="p-4 pb-2">
                 <CardTitle className="text-base flex items-center gap-1.5">
-                  <Package className="h-4 w-4" />
+                  <PackageCheck className="h-4 w-4" />
                   Manual Fulfillment
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4">
                 <p className="text-sm text-muted-foreground mb-4">
-                  Trigger automated fulfillment for all pending orders manually
+                  Process all pending orders at once with our suppliers
                 </p>
                 <Button 
                   className="w-full" 
-                  onClick={handleAutoFulfill}
+                  onClick={() => autoFulfillMutation.mutate()}
                   disabled={autoFulfillMutation.isPending || pendingOrders.length === 0}
                 >
                   {autoFulfillMutation.isPending ? (
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   ) : (
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                    <Truck className="h-4 w-4 mr-2" />
                   )}
                   {pendingOrders.length === 0 
-                    ? 'No Pending Orders' 
+                    ? 'No Orders to Fulfill' 
                     : `Fulfill ${pendingOrders.length} Orders`
                   }
                 </Button>
               </CardContent>
             </Card>
 
-            {/* Automatic Fulfillment Settings */}
+            {/* Automation Settings */}
             <Card className="bg-muted/50">
               <CardHeader className="p-4 pb-2">
                 <CardTitle className="text-base flex items-center gap-1.5">
                   <Settings className="h-4 w-4" />
-                  Auto-Fulfillment Settings
+                  Automation Settings
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-4">
@@ -392,180 +307,131 @@ export function AutoFulfillment() {
                     id="auto-fulfill" 
                     checked={autoFulfill}
                     onCheckedChange={handleAutoFulfillToggle}
-                    disabled={scheduleAutoFulfillMutation.isPending}
+                    disabled={scheduleFulfillmentMutation.isPending}
                   />
                   <Label htmlFor="auto-fulfill">Enable Auto-Fulfillment</Label>
-                  {scheduleAutoFulfillMutation.isPending && (
+                  {scheduleFulfillmentMutation.isPending && (
                     <Loader2 className="h-4 w-4 animate-spin ml-auto" />
                   )}
                 </div>
-                <div className={`${!autoFulfill ? 'opacity-50' : ''} space-y-3`}>
+                
+                <div className={`${!autoFulfill ? 'opacity-50' : ''} space-y-1 text-sm`}>
                   <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Check Frequency:</span>
-                    <span className="text-sm font-medium">Every 15 minutes</span>
+                    <span className="text-muted-foreground">Check Frequency:</span>
+                    <span className="font-medium">Hourly</span>
                   </div>
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <CalendarClock className="h-4 w-4 mr-1.5 flex-shrink-0" />
-                    <span>
-                      Orders will be automatically fulfilled once payment is confirmed
-                    </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Fulfillment Trigger:</span>
+                    <span className="font-medium">Payment received</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Supplier Selection:</span>
+                    <span className="font-medium">Auto-optimized</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          <div className="bg-muted/30 p-4 rounded-lg border flex items-start mt-2">
+          <div className="bg-muted/30 p-4 rounded-lg border flex items-start mt-2 mb-6">
             <Sparkles className="h-5 w-5 text-amber-500 mr-3 mt-0.5" />
             <div>
-              <h3 className="font-medium">Automated Fulfillment Process</h3>
+              <h3 className="font-medium">Automated Order Fulfillment</h3>
               <p className="text-sm text-muted-foreground mt-1">
-                Our AI-powered system automatically sends orders to the optimal suppliers, tracks fulfillment progress,
-                and notifies customers at every step. All supplier communications, inventory checks, and tracking updates
-                are handled without requiring any manual intervention.
+                Our system automatically sends order details to suppliers for fulfillment as soon as payment 
+                is received. The system selects the optimal supplier based on price, shipping time, and 
+                reliability metrics, completely eliminating manual order processing.
               </p>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Order Lists */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Order Fulfillment Status</CardTitle>
-          <CardDescription>
-            Monitor and manage all your orders in various fulfillment stages
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Tabs value={activeTab} onValueChange={setActiveTab}>
-            <div className="px-6">
-              <TabsList className="grid grid-cols-4">
-                <TabsTrigger value="pending" className="flex items-center gap-1.5">
-                  <Clock className="h-4 w-4" />
-                  <span>Pending</span>
-                  <Badge variant="secondary" className="ml-auto">{pendingOrders.length}</Badge>
-                </TabsTrigger>
-                <TabsTrigger value="processing" className="flex items-center gap-1.5">
-                  <Package className="h-4 w-4" />
-                  <span>Processing</span>
-                  <Badge variant="secondary" className="ml-auto">{processingOrders.length}</Badge>
-                </TabsTrigger>
-                <TabsTrigger value="shipped" className="flex items-center gap-1.5">
-                  <TruckIcon className="h-4 w-4" />
-                  <span>Shipped</span>
-                  <Badge variant="secondary" className="ml-auto">{shippedOrders.length}</Badge>
-                </TabsTrigger>
-                <TabsTrigger value="delivered" className="flex items-center gap-1.5">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span>Delivered</span>
-                  <Badge variant="secondary" className="ml-auto">{deliveredOrders.length}</Badge>
-                </TabsTrigger>
-              </TabsList>
-            </div>
-
-            <div className="mt-4">
-              <TabsContent value="pending">
-                {renderOrderList(pendingOrders, 'pending')}
-              </TabsContent>
-              
-              <TabsContent value="processing">
-                {renderOrderList(processingOrders, 'processing')}
-              </TabsContent>
-              
-              <TabsContent value="shipped">
-                {renderOrderList(shippedOrders, 'shipped')}
-              </TabsContent>
-              
-              <TabsContent value="delivered">
-                {renderOrderList(deliveredOrders, 'delivered')}
-              </TabsContent>
-            </div>
-          </Tabs>
+          <div className="border rounded-md overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Order</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Amount</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Automation Status</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {pendingOrders.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
+                      No pending orders to fulfill
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  pendingOrders.map((order: any) => (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-medium">#{order.orderNumber}</TableCell>
+                      <TableCell>{order.customerName}</TableCell>
+                      <TableCell>
+                        {new Date(order.createdAt).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>${order.total}</TableCell>
+                      <TableCell>
+                        {getStatusBadge(order.status)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Progress 
+                            value={
+                              order.paymentStatus === 'paid' ? 100 : 
+                              order.paymentStatus === 'pending' ? 50 : 0
+                            } 
+                            max={100}
+                            className="h-2 w-16"
+                          />
+                          <span className="text-xs text-muted-foreground">
+                            {order.paymentStatus === 'paid' ? 'Ready for fulfillment' : 'Awaiting payment'}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-8"
+                          disabled={fulfillOrderMutation.isPending || order.paymentStatus !== 'paid'}
+                          onClick={() => fulfillOrderMutation.mutate(order.id)}
+                        >
+                          {fulfillOrderMutation.isPending && fulfillOrderMutation.variables === order.id ? (
+                            <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
+                          ) : (
+                            <ArrowUpRight className="h-3.5 w-3.5 mr-2" />
+                          )}
+                          Fulfill Now
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
+        <CardFooter className="flex justify-between border-t px-6 py-4">
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Clock className="h-4 w-4" />
+            <span>Last updated: {new Date().toLocaleString()}</span>
+          </div>
+          <Button 
+            variant="outline"
+            onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ['/api/fulfillment/pending'] });
+            }}
+            className="gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh Orders
+          </Button>
+        </CardFooter>
       </Card>
     </div>
   );
-
-  // Helper function to render order lists
-  function renderOrderList(orders: any[], status: string) {
-    if (orders.length === 0) {
-      return (
-        <div className="py-12 text-center">
-          <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4 opacity-20" />
-          <p className="text-muted-foreground">No orders in {status} status</p>
-        </div>
-      );
-    }
-
-    return (
-      <div className="divide-y">
-        {orders.map((order) => (
-          <div key={order.id} className="p-4">
-            <div className="flex flex-col sm:flex-row justify-between mb-2">
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="font-medium">Order #{order.orderNumber}</h3>
-                  {getStatusBadge(order.fulfillment || 'pending')}
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {formatDate(order.createdAt)} • {order.customerName}
-                </p>
-              </div>
-              <div className="mt-2 sm:mt-0 text-right">
-                <p className="font-medium">{order.total}</p>
-                <p className="text-sm text-muted-foreground">
-                  Payment: <span className="capitalize">{order.paymentStatus}</span>
-                </p>
-              </div>
-            </div>
-            
-            <Separator className="my-2" />
-            
-            {(status === 'processing' || status === 'shipped' || status === 'delivered') && 
-              renderTrackingInfo(order)
-            }
-            
-            {status === 'pending' && (
-              <div className="flex justify-end mt-2">
-                <Button 
-                  size="sm"
-                  onClick={() => {
-                    // Manually fulfill this specific order
-                    fetch(`/api/fulfillment/fulfill/${order.id}`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ fulfillmentMode: 'automatic' })
-                    })
-                    .then(response => {
-                      if (!response.ok) throw new Error('Fulfillment failed');
-                      return response.json();
-                    })
-                    .then(() => {
-                      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
-                      toast({
-                        title: "Order Fulfilled",
-                        description: `Order #${order.orderNumber} has been sent to suppliers.`,
-                      });
-                    })
-                    .catch(error => {
-                      console.error('Error fulfilling order:', error);
-                      toast({
-                        title: "Fulfillment Failed",
-                        description: "There was an error processing the order. Please try again.",
-                        variant: "destructive",
-                      });
-                    });
-                  }}
-                >
-                  <TruckIcon className="h-4 w-4 mr-2" />
-                  Fulfill Order
-                </Button>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-    );
-  }
 }

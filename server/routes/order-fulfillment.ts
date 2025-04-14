@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import * as orderFulfillmentService from '../services/order-fulfillment';
+import * as orderFulfillment from '../services/order-fulfillment';
 
 const router = Router();
 
@@ -10,7 +10,6 @@ const router = Router();
 router.post('/fulfill/:orderId', async (req: Request, res: Response) => {
   try {
     const orderId = parseInt(req.params.orderId);
-    const { supplierIds, fulfillmentMode } = req.body;
     
     if (isNaN(orderId)) {
       return res.status(400).json({ 
@@ -19,13 +18,9 @@ router.post('/fulfill/:orderId', async (req: Request, res: Response) => {
       });
     }
     
-    const fulfillmentResponse = await orderFulfillmentService.fulfillOrder({
-      orderId,
-      supplierIds,
-      fulfillmentMode
-    });
+    const result = await orderFulfillment.fulfillOrder(orderId);
     
-    res.json(fulfillmentResponse);
+    res.json(result);
   } catch (error) {
     console.error('Error fulfilling order:', error);
     res.status(500).json({ 
@@ -50,9 +45,9 @@ router.get('/track/:orderId', async (req: Request, res: Response) => {
       });
     }
     
-    const trackingResponse = await orderFulfillmentService.trackOrderFulfillment(orderId);
+    const trackingInfo = await orderFulfillment.trackOrderFulfillment(orderId);
     
-    res.json(trackingResponse);
+    res.json(trackingInfo);
   } catch (error) {
     console.error('Error tracking order fulfillment:', error);
     res.status(500).json({ 
@@ -68,14 +63,16 @@ router.get('/track/:orderId', async (req: Request, res: Response) => {
  */
 router.post('/auto-fulfill', async (req: Request, res: Response) => {
   try {
-    const fulfillmentResponses = await orderFulfillmentService.autoFulfillPendingOrders();
+    const results = await orderFulfillment.autoFulfillOrders();
+    
+    const successCount = results.filter(r => r.success).length;
+    const failureCount = results.length - successCount;
     
     res.json({
-      processedCount: fulfillmentResponses.length,
-      successCount: fulfillmentResponses.filter(resp => resp.status === 'success').length,
-      partialCount: fulfillmentResponses.filter(resp => resp.status === 'partial').length,
-      failedCount: fulfillmentResponses.filter(resp => resp.status === 'failed').length,
-      results: fulfillmentResponses
+      totalOrders: results.length,
+      successCount,
+      failureCount,
+      results: results
     });
   } catch (error) {
     console.error('Error auto-fulfilling orders:', error);
@@ -92,22 +89,54 @@ router.post('/auto-fulfill', async (req: Request, res: Response) => {
  */
 router.post('/schedule', async (req: Request, res: Response) => {
   try {
-    const { intervalMinutes = 15 } = req.body;
+    const { 
+      intervalHours = 1,
+      notifyCustomer = true,
+      autoSelectSupplier = true,
+      prioritizationStrategy = 'balanced'
+    } = req.body;
     
-    // In a real application, you would store this in a database
-    // and use a proper job scheduler
+    // Validate input parameters
+    if (typeof intervalHours !== 'number' || intervalHours < 0.1) {
+      return res.status(400).json({
+        error: 'Invalid interval',
+        message: 'Interval must be a positive number in hours'
+      });
+    }
     
-    // For this demo, we'll just start the interval
-    orderFulfillmentService.scheduleAutoFulfillment(intervalMinutes);
+    if (!['price', 'speed', 'reliability', 'balanced'].includes(prioritizationStrategy)) {
+      return res.status(400).json({
+        error: 'Invalid prioritization strategy',
+        message: "Strategy must be one of: 'price', 'speed', 'reliability', 'balanced'"
+      });
+    }
+    
+    // Convert hours to minutes for the service
+    const checkIntervalMinutes = intervalHours * 60;
+    
+    // In a real application, you would store this configuration in a database
+    // For this demo, we just call the service
+    orderFulfillment.scheduleAutoFulfillment({
+      checkIntervalMinutes,
+      notifyCustomer,
+      autoSelectSupplier,
+      prioritizationStrategy
+    });
     
     res.json({
-      message: `Automatic order fulfillment scheduled every ${intervalMinutes} minutes`,
+      message: `Automatic order fulfillment scheduled every ${intervalHours} hours`,
+      settings: {
+        checkIntervalMinutes,
+        notifyCustomer,
+        autoSelectSupplier,
+        prioritizationStrategy
+      },
       status: 'active'
     });
   } catch (error) {
-    console.error('Error scheduling auto-fulfillment:', error);
+    console.error('Error scheduling order fulfillment:', error);
     res.status(500).json({ 
-      error: 'Failed to schedule auto-fulfillment',
+      error: 'Failed to schedule order fulfillment',
       message: error instanceof Error ? error.message : 'Unknown error'
     });
   }
