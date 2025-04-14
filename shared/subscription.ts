@@ -68,7 +68,7 @@ export const planFeatureLimits = {
     maxOrdersPerDay: 10,
     maxApi: 50, // API requests per day
     features: {
-      // Basic features
+      // Basic features available in free plan
       basicAnalytics: true,
       basicSupplierSearch: true,
       manualOrderFulfillment: true,
@@ -77,16 +77,16 @@ export const planFeatureLimits = {
       // IMPORTANT: In development mode, these features are still accessible 
       // even though they're marked as false here (see feature-access route)
       
-      // Advanced features - available in premium plans
-      aiPoweredAnalytics: true, // Making all features available in FREE plan
-      automatedPriceOptimization: true,
-      automatedOrderFulfillment: true,
-      demandForecasting: true,
-      competitorTracking: true,
-      aiProductDescriptions: true,
-      emailMarketing: true,
-      socialMediaAutomation: true,
-      prioritySupport: true,
+      // Advanced features - require paid subscription
+      aiPoweredAnalytics: false,
+      automatedPriceOptimization: false,
+      automatedOrderFulfillment: false,
+      demandForecasting: false,
+      competitorTracking: false,
+      aiProductDescriptions: false,
+      emailMarketing: false,
+      socialMediaAutomation: false,
+      prioritySupport: false,
     }
   },
   [SubscriptionPlan.BASIC]: {
