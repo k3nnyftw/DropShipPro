@@ -10,11 +10,19 @@ import { generateOrderNumber } from "@/lib/utils";
 
 // modify the interface with any CRUD methods
 // you might need
+import { Subscription, InsertSubscription, SubscriptionPlan } from '../shared/subscription';
+
 export interface IStorage {
   // User methods
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserPlan(userId: number, plan: SubscriptionPlan): Promise<User | undefined>;
+  
+  // Subscription methods
+  getUserSubscription(userId: number): Promise<Subscription | undefined>;
+  createSubscription(subscription: InsertSubscription): Promise<Subscription>;
+  updateSubscription(id: number, updates: Partial<Subscription>): Promise<Subscription | undefined>;
   
   // Product methods
   getProduct(id: number): Promise<Product | undefined>;
@@ -57,6 +65,7 @@ export class MemStorage implements IStorage {
   private orders: Map<number, Order>;
   private campaigns: Map<number, Campaign>;
   private payments: Map<number, Payment>;
+  private subscriptions: Map<number, Subscription>;
   currentId: number;
 
   constructor() {
@@ -66,6 +75,7 @@ export class MemStorage implements IStorage {
     this.orders = new Map();
     this.campaigns = new Map();
     this.payments = new Map();
+    this.subscriptions = new Map();
     this.currentId = 1;
     this.initDemoData();
   }
@@ -261,9 +271,86 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.currentId++;
-    const user: User = { ...insertUser, id };
+    const createdAt = new Date();
+    const user: User = { 
+      ...insertUser, 
+      id, 
+      createdAt,
+      plan: insertUser.plan || SubscriptionPlan.FREE,
+      fullName: insertUser.fullName || null,
+      trialEndsAt: insertUser.trialEndsAt || null
+    };
     this.users.set(id, user);
     return user;
+  }
+  
+  async updateUserPlan(userId: number, plan: SubscriptionPlan): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) {
+      return undefined;
+    }
+    
+    const updatedUser = { ...user, plan };
+    this.users.set(userId, updatedUser);
+    return updatedUser;
+  }
+  
+  // Subscription methods
+  async getUserSubscription(userId: number): Promise<Subscription | undefined> {
+    return Array.from(this.subscriptions.values()).find(
+      (subscription) => subscription.userId === userId,
+    );
+  }
+  
+  async createSubscription(insertSubscription: InsertSubscription): Promise<Subscription> {
+    const id = this.currentId++;
+    const createdAt = new Date();
+    const updatedAt = new Date();
+    
+    const subscription: Subscription = {
+      ...insertSubscription,
+      id,
+      createdAt,
+      updatedAt,
+      // Set defaults for optional fields
+      status: insertSubscription.status || SubscriptionStatus.ACTIVE,
+      plan: insertSubscription.plan || SubscriptionPlan.FREE,
+      priceId: insertSubscription.priceId || null,
+      stripeCustomerId: insertSubscription.stripeCustomerId || null,
+      stripeSubscriptionId: insertSubscription.stripeSubscriptionId || null,
+      currentPeriodStart: insertSubscription.currentPeriodStart || new Date(),
+      currentPeriodEnd: insertSubscription.currentPeriodEnd || null,
+      cancelAtPeriodEnd: insertSubscription.cancelAtPeriodEnd || false,
+    };
+    
+    this.subscriptions.set(id, subscription);
+    
+    // Also update the user's plan
+    this.updateUserPlan(subscription.userId, subscription.plan);
+    
+    return subscription;
+  }
+  
+  async updateSubscription(id: number, updates: Partial<Subscription>): Promise<Subscription | undefined> {
+    const subscription = this.subscriptions.get(id);
+    if (!subscription) {
+      return undefined;
+    }
+    
+    const updatedSubscription = {
+      ...subscription,
+      ...updates,
+      updatedAt: new Date()
+    };
+    
+    this.subscriptions.set(id, updatedSubscription);
+    
+    // If plan is updated, also update the user's plan
+    if (updates.plan) {
+      this.updateUserPlan(subscription.userId, updates.plan);
+    }
+    
+    return updatedSubscription;
   }
 
   // Product methods
