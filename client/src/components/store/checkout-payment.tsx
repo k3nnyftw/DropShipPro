@@ -48,13 +48,10 @@ export function CheckoutPayment({ amount, orderId, onPaymentComplete }: Checkout
         const amountInCents = Math.round(amount * 100);
         
         // Create a payment intent
-        const response = await apiRequest('/api/payments/create-payment-intent', {
-          method: 'POST',
-          body: JSON.stringify({
-            amount: amountInCents,
-            currency: 'usd',
-            orderId: orderId,
-          }),
+        const response = await apiRequest('POST', '/api/payments/create-payment-intent', {
+          amount: amountInCents,
+          currency: 'usd',
+          orderId: orderId,
         });
         
         if (response.clientSecret) {
