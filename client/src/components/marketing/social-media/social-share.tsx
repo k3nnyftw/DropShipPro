@@ -318,14 +318,15 @@ export default function SocialShare() {
 
   // Share now mutation
   const shareNowMutation = useMutation({
-    mutationFn: () => {
-      return apiRequest('POST', `/api/social-media/share-now/${selectedProductId}`, {
+    mutationFn: async () => {
+      const response = await apiRequest('POST', `/api/social-media/share-now/${selectedProductId}`, {
         platforms: selectedPlatforms,
         options: postFormat
       });
+      return response as { results: Array<{success: boolean, platform: string, message: string}> };
     },
-    onSuccess: (data) => {
-      const successCount = data.results.filter((r: any) => r.success).length;
+    onSuccess: (data: { results: Array<{success: boolean, platform: string, message: string}> }) => {
+      const successCount = data?.results?.filter((r) => r.success).length || 0;
       
       toast({
         title: "Shared Successfully",
@@ -346,22 +347,24 @@ export default function SocialShare() {
 
   // Schedule posts mutation
   const schedulePostsMutation = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       // Combine date and time slot
       const scheduledDateTime = new Date(selectedScheduleDate);
       const [hours, minutes] = selectedTimeSlot.split(':').map(Number);
       scheduledDateTime.setHours(hours, minutes, 0, 0);
       
-      return apiRequest('POST', `/api/social-media/schedule/${selectedProductId}`, {
+      const response = await apiRequest('POST', `/api/social-media/schedule/${selectedProductId}`, {
         platforms: selectedPlatforms,
         scheduledTime: scheduledDateTime.toISOString(),
         options: postFormat
       });
+      return response as { count?: number, scheduledPosts?: any[] };
     },
-    onSuccess: (data) => {
+    onSuccess: (data: { count?: number, scheduledPosts?: any[] }) => {
+      const platformCount = data?.count || data?.scheduledPosts?.length || selectedPlatforms.length;
       toast({
         title: "Posts Scheduled",
-        description: `Scheduled posts for ${data.count} platforms.`,
+        description: `Scheduled posts for ${platformCount} platforms.`,
       });
       
       queryClient.invalidateQueries({ queryKey: ['/api/social-media/scheduled'] });

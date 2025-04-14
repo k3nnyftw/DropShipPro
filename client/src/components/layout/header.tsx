@@ -9,60 +9,40 @@ const Header: React.FC = () => {
     <header className="bg-white shadow-sm">
       <div className="container mx-auto px-4 py-3 flex items-center justify-between">
         <div className="flex items-center">
-          <Link href="/">
-            <a className="flex items-center">
-              <span className="text-2xl font-bold text-primary-600 font-display">
-                DropShipify
-              </span>
-            </a>
+          <Link href="/" className="flex items-center">
+            <span className="text-2xl font-bold text-primary-600 font-display">
+              DropShipify
+            </span>
           </Link>
         </div>
         
         <div className="hidden md:flex items-center space-x-8">
-          <Link href="/">
-            <a className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
-              Dashboard
-            </a>
+          <Link href="/" className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
+            Dashboard
           </Link>
-          <Link href="/product-discovery">
-            <a className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
-              Products
-            </a>
+          <Link href="/product-discovery" className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
+            Products
           </Link>
-          <Link href="/product-description-generator">
-            <a className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
-              AI Content
-            </a>
+          <Link href="/product-description-generator" className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
+            AI Content
           </Link>
-          <Link href="/orders">
-            <a className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
-              Orders
-            </a>
+          <Link href="/orders" className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
+            Orders
           </Link>
-          <Link href="/supplier-analysis">
-            <a className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
-              Suppliers
-            </a>
+          <Link href="/supplier-analysis" className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
+            Suppliers
           </Link>
-          <Link href="/competitor-tracking">
-            <a className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
-              Competitors
-            </a>
+          <Link href="/competitor-tracking" className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
+            Competitors
           </Link>
-          <Link href="/advertising">
-            <a className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
-              Analytics
-            </a>
+          <Link href="/advertising" className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
+            Analytics
           </Link>
-          <Link href="/email-marketing">
-            <a className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
-              Email
-            </a>
+          <Link href="/email-marketing" className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
+            Email
           </Link>
-          <Link href="/social-sharing">
-            <a className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
-              Social
-            </a>
+          <Link href="/social-sharing" className="font-medium text-gray-700 hover:text-primary-600 transition-colors duration-200">
+            Social
           </Link>
         </div>
         
