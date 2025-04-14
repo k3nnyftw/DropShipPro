@@ -325,13 +325,13 @@ function simulateCompetitorPrices(product: Product): CompetitorPrice[] {
   const ourPrice = parseFloat(product.price);
   
   const competitors = [
-    { id: 1, name: "ShopFirst" },
-    { id: 2, name: "QuickCommerce" },
-    { id: 3, name: "FastCart" },
-    { id: 4, name: "MegaMarket" },
-    { id: 5, name: "TopDeal" },
-    { id: 6, name: "ValueShop" },
-    { id: 7, name: "PrimeStore" }
+    { id: 1, name: "ShopFirst", domain: "shopfirst.com" },
+    { id: 2, name: "QuickCommerce", domain: "quickcommerce.net" },
+    { id: 3, name: "FastCart", domain: "fastcart.io" },
+    { id: 4, name: "MegaMarket", domain: "megamarketplace.com" },
+    { id: 5, name: "TopDeal", domain: "topdeal.store" },
+    { id: 6, name: "ValueShop", domain: "valueshop.com" },
+    { id: 7, name: "PrimeStore", domain: "primestore.co" }
   ];
   
   // Select a random subset of competitors
@@ -348,13 +348,16 @@ function simulateCompetitorPrices(product: Product): CompetitorPrice[] {
     const priceGap = ourPrice - competitorPrice;
     const priceGapPercentage = (priceGap / competitorPrice) * 100;
     
+    // Create a realistic competitor URL with actual domain and product slug
+    const productSlug = product.name.toLowerCase().replace(/\s+/g, '-');
+    
     return {
       competitorId: competitor.id,
       competitorName: competitor.name,
       productId: product.id,
       productName: product.name,
       competitorPrice,
-      competitorUrl: `https://example.com/${competitor.name.toLowerCase()}/product/${product.id}`,
+      competitorUrl: `https://www.${competitor.domain}/products/${productSlug}/${product.id}`,
       priceGap,
       priceGapPercentage,
       lastUpdated: new Date()
