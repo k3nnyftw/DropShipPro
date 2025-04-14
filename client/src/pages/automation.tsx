@@ -3,7 +3,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PriceOptimization } from "@/components/store/price-optimization";
 import { InventoryAutomation } from "@/components/store/inventory-automation";
 import { AutoFulfillment } from "@/components/orders/auto-fulfillment";
-import { DollarSign, Package, Truck, Sparkles } from "lucide-react";
+import { DemandForecasting } from "@/components/automation/demand-forecasting";
+import { DollarSign, Package, Truck, Sparkles, Brain } from "lucide-react";
 
 const Automation: React.FC = () => {
   return (
@@ -29,8 +30,12 @@ const Automation: React.FC = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="price-optimization" className="space-y-8">
-        <TabsList className="grid grid-cols-3 w-full max-w-2xl mx-auto mb-4">
+      <Tabs defaultValue="demand-forecasting" className="space-y-8">
+        <TabsList className="grid grid-cols-4 w-full max-w-3xl mx-auto mb-4">
+          <TabsTrigger value="demand-forecasting" className="flex items-center justify-center gap-2">
+            <Brain className="h-4 w-4" />
+            <span>Demand Forecasting</span>
+          </TabsTrigger>
           <TabsTrigger value="price-optimization" className="flex items-center justify-center gap-2">
             <DollarSign className="h-4 w-4" />
             <span>Price Optimization</span>
@@ -44,6 +49,10 @@ const Automation: React.FC = () => {
             <span>Order Fulfillment</span>
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="demand-forecasting">
+          <DemandForecasting />
+        </TabsContent>
 
         <TabsContent value="price-optimization">
           <PriceOptimization />
