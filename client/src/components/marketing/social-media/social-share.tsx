@@ -259,24 +259,51 @@ export default function SocialShare() {
       return Promise.all(generatePromises);
     },
     onSuccess: (data) => {
-      // Map the results to a record by platform
-      const contentByPlatform: Record<string, GeneratedSocialContent> = {};
-      
-      data.forEach((content: GeneratedSocialContent) => {
-        contentByPlatform[content.platform] = content;
-      });
-      
-      setGeneratedContent(contentByPlatform);
-      setIsGeneratingContent(false);
-      
-      toast({
-        title: "Content Generated",
-        description: `Social media content generated for ${selectedPlatforms.length} platforms.`,
-      });
-      
-      // Show the preview modal if we have content
-      if (Object.keys(contentByPlatform).length > 0) {
-        setShowContentPreviewModal(true);
+      try {
+        // Map the results to a record by platform
+        const contentByPlatform: Record<string, GeneratedSocialContent> = {};
+        
+        // Ensure data is properly processed
+        if (Array.isArray(data)) {
+          data.forEach((content: any) => {
+            if (content && content.platform) {
+              contentByPlatform[content.platform] = {
+                platform: content.platform,
+                text: content.text || '',
+                hashtags: Array.isArray(content.hashtags) ? content.hashtags : [],
+                mediaUrls: Array.isArray(content.mediaUrls) ? content.mediaUrls : [],
+                linkUrl: content.linkUrl
+              };
+            }
+          });
+        }
+        
+        setGeneratedContent(contentByPlatform);
+        setIsGeneratingContent(false);
+        
+        toast({
+          title: "Content Generated",
+          description: `Social media content generated for ${Object.keys(contentByPlatform).length} platforms.`,
+        });
+        
+        // Show the preview modal if we have content
+        if (Object.keys(contentByPlatform).length > 0) {
+          setShowContentPreviewModal(true);
+        } else {
+          toast({
+            title: "Warning",
+            description: "No content was generated. Please try again with different options.",
+            variant: "destructive"
+          });
+        }
+      } catch (error) {
+        console.error("Error processing generated content:", error);
+        setIsGeneratingContent(false);
+        toast({
+          title: "Error",
+          description: "An error occurred while processing the generated content.",
+          variant: "destructive"
+        });
       }
     },
     onError: (error) => {
