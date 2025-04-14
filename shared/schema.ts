@@ -67,6 +67,19 @@ export const campaigns = pgTable("campaigns", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const payments = pgTable("payments", {
+  id: serial("id").primaryKey(),
+  orderId: integer("order_id"),
+  amount: decimal("amount").notNull(),
+  currency: text("currency").default("USD"),
+  status: text("status").notNull(),
+  paymentMethod: text("payment_method").notNull(),
+  stripePaymentId: text("stripe_payment_id"),
+  stripeCustomerId: text("stripe_customer_id"),
+  metadata: json("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -122,6 +135,17 @@ export const insertCampaignSchema = createInsertSchema(campaigns).pick({
   roas: true,
 });
 
+export const insertPaymentSchema = createInsertSchema(payments).pick({
+  orderId: true,
+  amount: true,
+  currency: true,
+  status: true,
+  paymentMethod: true,
+  stripePaymentId: true,
+  stripeCustomerId: true,
+  metadata: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
@@ -136,3 +160,6 @@ export type Order = typeof orders.$inferSelect;
 
 export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
 export type Campaign = typeof campaigns.$inferSelect;
+
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export type Payment = typeof payments.$inferSelect;
