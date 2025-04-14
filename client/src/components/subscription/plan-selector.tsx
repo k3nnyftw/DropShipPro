@@ -75,11 +75,15 @@ export function PlanSelector({ open: externalOpen, onOpenChange }: PlanSelectorP
 
     setIsUpgrading(true);
     try {
-      const response = await apiRequest('/api/subscription/create-checkout-session', 'POST', {
-        plan: selectedPlan,
-        successUrl: `${window.location.origin}/dashboard?subscription=success`,
-        cancelUrl: `${window.location.origin}/dashboard?subscription=cancelled`,
-      });
+      const response = await apiRequest(
+        'POST',
+        '/api/subscription/create-checkout-session',
+        {
+          plan: selectedPlan,
+          successUrl: `${window.location.origin}/dashboard?subscription=success`,
+          cancelUrl: `${window.location.origin}/dashboard?subscription=cancelled`,
+        }
+      );
 
       if (response.url) {
         window.location.href = response.url;
@@ -97,7 +101,7 @@ export function PlanSelector({ open: externalOpen, onOpenChange }: PlanSelectorP
 
   const handleCancel = async () => {
     try {
-      await apiRequest('/api/subscription/cancel', 'POST');
+      await apiRequest('POST', '/api/subscription/cancel');
       
       toast({
         title: 'Subscription cancelled',
