@@ -327,6 +327,17 @@ router.get("/feature-access/:feature", async (req: Request, res: Response) => {
   const { feature } = req.params;
   
   try {
+    // DEVELOPMENT MODE: All features are accessible
+    // In production, you would remove this and use the actual subscription check
+    if (process.env.NODE_ENV !== "production") {
+      return res.json({
+        feature,
+        hasAccess: true, // Always grant access in development
+        plan: "developer",
+        upgradeTo: null
+      });
+    }
+    
     // Get user's plan
     const user = await storage.getUser(userId);
     

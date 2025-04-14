@@ -13,6 +13,7 @@ import competitorTrackingRoutes from "./routes/competitor-tracking";
 import productDescriptionRoutes from "./routes/product-description-generator";
 import emailMarketingRoutes from "./routes/email-marketing";
 import socialMediaSharingRoutes from "./routes/social-media-sharing";
+import subscriptionRoutes from "./routes/subscription";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register route modules
@@ -26,6 +27,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/descriptions', productDescriptionRoutes);
   app.use('/api/email-marketing', emailMarketingRoutes);
   app.use('/api/social-media', socialMediaSharingRoutes);
+  app.use('/api/subscription', subscriptionRoutes);
   
   // prefix all routes with /api
   
