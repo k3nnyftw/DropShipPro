@@ -1,0 +1,131 @@
+{
+  "family": "dropshipping-app",
+  "networkMode": "awsvpc",
+  "executionRoleArn": "${execution_role_arn}",
+  "taskRoleArn": "${task_role_arn}",
+  "containerDefinitions": [
+    {
+      "name": "api",
+      "image": "${ecr_image}",
+      "essential": true,
+      "portMappings": [
+        {
+          "containerPort": 5000,
+          "hostPort": 5000,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        {
+          "name": "FLASK_ENV",
+          "value": "production"
+        },
+        {
+          "name": "DATABASE_URL",
+          "value": "${database_url}"
+        },
+        {
+          "name": "REDIS_URL",
+          "value": "${redis_url}"
+        },
+        {
+          "name": "APP_NAME",
+          "value": "dropshipping"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "STRIPE_SECRET_KEY",
+          "valueFrom": "${secrets_arn}:STRIPE_SECRET_KEY::"
+        },
+        {
+          "name": "STRIPE_WEBHOOK_SECRET",
+          "valueFrom": "${secrets_arn}:STRIPE_WEBHOOK_SECRET::"
+        },
+        {
+          "name": "JWT_SECRET_KEY",
+          "valueFrom": "${secrets_arn}:JWT_SECRET_KEY::"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/dropshipping-app",
+          "awslogs-region": "${region}",
+          "awslogs-stream-prefix": "api"
+        }
+      },
+      "healthCheck": {
+        "command": [
+          "CMD-SHELL",
+          "curl -f http://localhost:5000/api/health || exit 1"
+        ],
+        "interval": 30,
+        "timeout": 5,
+        "retries": 3,
+        "startPeriod": 30
+      },
+      "ulimits": [
+        {
+          "name": "nofile",
+          "softLimit": 65536,
+          "hardLimit": 65536
+        }
+      ],
+      "mountPoints": [
+        {
+          "sourceVolume": "prometheus-multiproc",
+          "containerPath": "/tmp/prometheus-multiproc",
+          "readOnly": false
+        }
+      ]
+    }
+  ],
+  "volumes": [
+    {
+      "name": "prometheus-multiproc",
+      "host": {}
+    }
+  ],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "cpu": "256",
+  "memory": "512",
+  "tags": [
+    {
+      "key": "Name",
+      "value": "dropshipping-app"
+    },
+    {
+      "key": "Environment",
+      "value": "production"
+    }
+  ],
+  "proxyConfiguration": {
+    "type": "APPMESH",
+    "containerName": "envoy",
+    "properties": [
+      {
+        "name": "IgnoredUID",
+        "value": "1337"
+      },
+      {
+        "name": "ProxyIngressPort",
+        "value": "15000"
+      },
+      {
+        "name": "ProxyEgressPort",
+        "value": "15001"
+      },
+      {
+        "name": "AppPorts",
+        "value": "5000"
+      },
+      {
+        "name": "EgressIgnoredIPs",
+        "value": "169.254.170.2,169.254.169.254"
+      }
+    ]
+  }
+}
