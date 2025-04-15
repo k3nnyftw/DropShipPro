@@ -2,6 +2,7 @@ import React from "react";
 import Header from "./header";
 import Footer from "./footer";
 import TabNavigation from "./tab-navigation";
+import { SkipToContent } from "@/lib/accessibility";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -10,11 +11,19 @@ interface MainLayoutProps {
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50 text-gray-800">
+      {/* Add skip to content link for keyboard users */}
+      <SkipToContent />
+      
       <Header />
-      <main className="flex-grow container mx-auto px-4 py-6">
+      
+      {/* Add id for skip link target and improve semantics */}
+      <main id="main-content" className="flex-grow container mx-auto px-4 py-6">
         <TabNavigation />
-        {children}
+        <div className="pt-4" role="region" aria-label="Page content">
+          {children}
+        </div>
       </main>
+      
       <Footer />
     </div>
   );

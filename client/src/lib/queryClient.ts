@@ -96,12 +96,13 @@ type UnauthorizedBehavior = "returnNull" | "throw";
 /**
  * Enhanced query function with better caching and error handling
  */
-export const getQueryFn: <T>(options: {
+export const getQueryFn = <TData>(options: {
   on401: UnauthorizedBehavior;
   cacheTTL?: number; // Time in ms to consider cache valid
-}) => QueryFunction<T> =
-  ({ on401: unauthorizedBehavior, cacheTTL = 600000 }) => // Default 10 minutes cache
-  async ({ queryKey, signal }) => {
+}): QueryFunction<TData> => {
+  const { on401: unauthorizedBehavior, cacheTTL = 600000 } = options; // Default 10 minutes cache
+  
+  return async ({ queryKey, signal }) => {
     // Support for AbortController
     const controller = new AbortController();
     // Merge with existing signal if provided
@@ -120,7 +121,7 @@ export const getQueryFn: <T>(options: {
       });
 
       if (unauthorizedBehavior === "returnNull" && res.status === 401) {
-        return null as T;
+        return null as unknown as TData;
       }
 
       await throwIfResNotOk(res);
@@ -128,8 +129,8 @@ export const getQueryFn: <T>(options: {
       // Get data from response
       const data = await res.json();
       
-      // Just return the data directly to avoid type issues
-      return data as T;
+      // Just return the data directly
+      return data as TData;
     } catch (error) {
       if ((error as any).name === 'AbortError') {
         // Handle query cancellation
@@ -138,6 +139,7 @@ export const getQueryFn: <T>(options: {
       throw error;
     }
   };
+};
 
 // Create query cache with global error handling
 const queryCache = new QueryCache({
@@ -185,7 +187,7 @@ export const queryClient = new QueryClient({
       refetchOnReconnect: true, // Enable refetching when reconnecting
       refetchOnMount: true, // Enable refetching when component mounts
       staleTime: 300000, // Consider data stale after 5 minutes (300000ms)
-      cacheTime: 3600000, // Keep data in cache for 1 hour (3600000ms)
+      gcTime: 3600000, // Keep data in cache for 1 hour (3600000ms) - renamed from cacheTime in v5
       // Add structure data validation here when needed
     },
     mutations: {
