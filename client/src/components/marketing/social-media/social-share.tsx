@@ -1051,43 +1051,43 @@ export default function SocialShare() {
                         <div className="grid grid-cols-3 gap-2 text-center">
                           <div>
                             <p className="text-xs text-muted-foreground">Likes</p>
-                            <p className="text-sm font-medium">{platform.likes.toLocaleString()}</p>
+                            <p className="text-sm font-medium">{platform?.likes?.toLocaleString() || 0}</p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Shares</p>
-                            <p className="text-sm font-medium">{platform.shares.toLocaleString()}</p>
+                            <p className="text-sm font-medium">{platform?.shares?.toLocaleString() || 0}</p>
                           </div>
                           <div>
                             <p className="text-xs text-muted-foreground">Comments</p>
-                            <p className="text-sm font-medium">{platform.comments.toLocaleString()}</p>
+                            <p className="text-sm font-medium">{platform?.comments?.toLocaleString() || 0}</p>
                           </div>
                         </div>
                         
                         <div>
                           <div className="flex justify-between items-center text-xs mb-1">
                             <span className="text-muted-foreground">Engagement Rate</span>
-                            <span className="font-medium">{platform.engagementRate.toFixed(1)}%</span>
+                            <span className="font-medium">{platform?.engagementRate?.toFixed(1) || "0.0"}%</span>
                           </div>
                           <Progress 
                             className="h-1.5" 
-                            value={platform.engagementRate * 5} // multiply to make it more visible
+                            value={(platform?.engagementRate || 0) * 5} // multiply to make it more visible
                           />
                         </div>
                         
                         <div>
                           <div className="flex justify-between items-center text-xs mb-1">
                             <span className="text-muted-foreground">Conversion Rate</span>
-                            <span className="font-medium">{platform.conversionRate.toFixed(1)}%</span>
+                            <span className="font-medium">{platform?.conversionRate?.toFixed(1) || "0.0"}%</span>
                           </div>
                           <Progress 
                             className="h-1.5" 
-                            value={platform.conversionRate * 10} // multiply to make it more visible
+                            value={(platform?.conversionRate || 0) * 10} // multiply to make it more visible
                           />
                         </div>
                         
                         <div className="pt-2 border-t flex justify-between items-center">
                           <span className="text-xs text-muted-foreground">Revenue</span>
-                          <span className="text-sm font-bold">${platform.revenue.toLocaleString()}</span>
+                          <span className="text-sm font-bold">${platform?.revenue?.toLocaleString() || 0}</span>
                         </div>
                       </div>
                     </CardContent>
@@ -1131,17 +1131,17 @@ export default function SocialShare() {
                         
                         <div className="flex gap-4 text-sm">
                           <div className="text-center">
-                            <p className="font-medium">{post.engagement.toLocaleString()}</p>
+                            <p className="font-medium">{post?.engagement?.toLocaleString() || 0}</p>
                             <p className="text-xs text-muted-foreground">Engagement</p>
                           </div>
                           
                           <div className="text-center">
-                            <p className="font-medium">{post.clicks.toLocaleString()}</p>
+                            <p className="font-medium">{post?.clicks?.toLocaleString() || 0}</p>
                             <p className="text-xs text-muted-foreground">Clicks</p>
                           </div>
                           
                           <div className="text-center">
-                            <p className="font-medium">${post.revenue.toLocaleString()}</p>
+                            <p className="font-medium">${post?.revenue?.toLocaleString() || 0}</p>
                             <p className="text-xs text-muted-foreground">Revenue</p>
                           </div>
                         </div>
@@ -1211,17 +1211,17 @@ export default function SocialShare() {
                                     <h4 className="text-sm font-medium">{timeData.dayOfWeek}</h4>
                                     <div>
                                       <Badge variant="outline" className="text-xs">
-                                        {timeData.engagementRate.toFixed(1)}% engagement
+                                        {timeData?.engagementRate?.toFixed(1) || "0.0"}% engagement
                                       </Badge>
                                     </div>
                                   </div>
                                   
                                   <div className="flex flex-wrap gap-1">
-                                    {timeData.timeRanges.map((timeRange: string, idx: number) => (
+                                    {timeData?.timeRanges?.map((timeRange: string, idx: number) => (
                                       <Badge key={idx} variant="secondary" className="text-xs">
                                         {timeRange}
                                       </Badge>
-                                    ))}
+                                    )) || null}
                                   </div>
                                 </div>
                               ))}
