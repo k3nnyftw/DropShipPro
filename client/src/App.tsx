@@ -1,11 +1,18 @@
-import { Route, Switch } from "wouter";
-import { Suspense, lazy } from "react";
+import { Route, Switch, useLocation } from "wouter";
+import { Suspense, lazy, useEffect, useCallback } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import MainLayout from "@/components/layout/main-layout";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import ErrorBoundary from "@/components/ui/error-boundary";
 import { lazyImportDefault } from "@/lib/lazyImport";
 import { Loader2 } from "lucide-react";
+import { 
+  SkipToContent, 
+  AnnouncementProvider, 
+  KeyboardShortcuts,
+  useAnnouncement
+} from "@/lib/accessibility";
+import { globalErrorHandler } from "@/lib/defensive";
 
 // Lazy load all page components
 const Dashboard = lazyImportDefault(() => import("@/pages/dashboard"));
@@ -23,40 +30,101 @@ const SocialSharingPage = lazyImportDefault(() => import("@/pages/social-sharing
 
 // Suspense fallback loading component
 const PageLoader = () => (
-  <div className="flex h-[75vh] w-full items-center justify-center">
+  <div className="flex h-[75vh] w-full items-center justify-center" aria-label="Loading page content">
     <div className="flex flex-col items-center gap-2">
-      <Loader2 className="h-10 w-10 animate-spin text-primary" />
-      <p className="text-sm text-muted-foreground">Loading page...</p>
+      <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden="true" />
+      <p className="text-sm text-muted-foreground" role="status">Loading page...</p>
     </div>
   </div>
 );
 
-function App() {
+// Set up global error handling
+window.addEventListener('error', (event) => {
+  globalErrorHandler(event.error || new Error('Unknown error occurred'));
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  globalErrorHandler(
+    event.reason instanceof Error 
+      ? event.reason 
+      : new Error(`Unhandled Promise rejection: ${event.reason}`)
+  );
+});
+
+// Main app component
+function AppContent() {
+  const [location, setLocation] = useLocation();
+  const { announce, Announcer } = useAnnouncement();
+  
+  // Create a navigate function
+  const navigate = useCallback((path: string) => {
+    setLocation(path);
+  }, [setLocation]);
+  
+  // Announce route changes for screen readers
+  useEffect(() => {
+    // Extract page name from URL for announcement
+    const pageName = location === '/' 
+      ? 'Dashboard' 
+      : location.substring(1).split('-').map(word => 
+          word.charAt(0).toUpperCase() + word.slice(1)
+        ).join(' ');
+        
+    announce(`Navigated to ${pageName} page`, 'polite');
+  }, [location, announce]);
+  
+  // Define keyboard shortcuts
+  const shortcuts = {
+    'd': () => navigate('/'),
+    's': () => navigate('/store'),
+    'p': () => navigate('/product-discovery'),
+    'o': () => navigate('/orders'),
+    'a': () => navigate('/advertising'),
+    'u': () => navigate('/automation'),
+    'escape': () => document.activeElement instanceof HTMLElement && document.activeElement.blur(),
+  };
+  
   return (
-    <ErrorBoundary>
+    <>
+      <SkipToContent />
+      <Announcer />
+      <KeyboardShortcuts shortcuts={shortcuts} />
+      
       <ThemeProvider>
         <MainLayout>
-          <ErrorBoundary>
-            <Suspense fallback={<PageLoader />}>
-              <Switch>
-                <Route path="/" component={Dashboard} />
-                <Route path="/store" component={StoreView} />
-                <Route path="/product-discovery" component={ProductDiscovery} />
-                <Route path="/supplier-analysis" component={SupplierAnalysis} />
-                <Route path="/advertising" component={Advertising} />
-                <Route path="/orders" component={Orders} />
-                <Route path="/automation" component={Automation} />
-                <Route path="/competitor-tracking" component={CompetitorTrackingPage} />
-                <Route path="/product-description-generator" component={ProductDescriptionGeneratorPage} />
-                <Route path="/email-marketing" component={EmailMarketingPage} />
-                <Route path="/social-sharing" component={SocialSharingPage} />
-                <Route component={NotFound} />
-              </Switch>
-            </Suspense>
-          </ErrorBoundary>
+          <main id="main-content" tabIndex={-1} className="outline-none">
+            <ErrorBoundary>
+              <Suspense fallback={<PageLoader />}>
+                <Switch>
+                  <Route path="/" component={Dashboard} />
+                  <Route path="/store" component={StoreView} />
+                  <Route path="/product-discovery" component={ProductDiscovery} />
+                  <Route path="/supplier-analysis" component={SupplierAnalysis} />
+                  <Route path="/advertising" component={Advertising} />
+                  <Route path="/orders" component={Orders} />
+                  <Route path="/automation" component={Automation} />
+                  <Route path="/competitor-tracking" component={CompetitorTrackingPage} />
+                  <Route path="/product-description-generator" component={ProductDescriptionGeneratorPage} />
+                  <Route path="/email-marketing" component={EmailMarketingPage} />
+                  <Route path="/social-sharing" component={SocialSharingPage} />
+                  <Route component={NotFound} />
+                </Switch>
+              </Suspense>
+            </ErrorBoundary>
+          </main>
         </MainLayout>
         <Toaster />
       </ThemeProvider>
+    </>
+  );
+}
+
+function App() {
+  return (
+    <ErrorBoundary>
+      <AnnouncementProvider>
+        <AppContent />
+      </AnnouncementProvider>
     </ErrorBoundary>
   );
 }
