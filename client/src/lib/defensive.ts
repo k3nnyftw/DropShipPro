@@ -4,6 +4,52 @@
  */
 
 /**
+ * Global error handler for unhandled exceptions
+ * @param error - The error that occurred
+ * @param errorInfo - Additional error info (from React error boundaries)
+ */
+export function globalErrorHandler(error: Error, errorInfo?: React.ErrorInfo): void {
+  // Log to console for development
+  console.error('Unhandled error:', error);
+  if (errorInfo) {
+    console.error('Component stack trace:', errorInfo.componentStack);
+  }
+  
+  // In production, you would send error to monitoring service
+  if (process.env.NODE_ENV === 'production') {
+    // This would be replaced with actual error reporting integration
+    try {
+      // Sample code for error reporting (this would be replaced with real service)
+      const errorReport = {
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+        componentStack: errorInfo?.componentStack,
+        timestamp: new Date().toISOString(),
+        url: window.location.href,
+        userAgent: navigator.userAgent
+      };
+      
+      // Would send to error monitoring service in production
+      console.info('Error report prepared:', errorReport);
+      
+      // Show user-friendly toast notification
+      // You would use your toast notification system here
+    } catch (reportingError) {
+      // Fail silently if error reporting itself fails
+      console.error('Error while reporting error:', reportingError);
+    }
+  }
+}
+
+/**
+ * Type guard to check if value is defined (not null or undefined)
+ */
+export function isDefined<T>(value: T | null | undefined): value is T {
+  return value !== null && value !== undefined;
+}
+
+/**
  * Safely access a potentially undefined/null object property
  * @param obj - The object to access
  * @param key - The property key to access
@@ -94,6 +140,31 @@ export function safeFormatNumber(
 }
 
 /**
+ * Safely format a number to a specific number of decimal places
+ * @param value - The number to format
+ * @param decimals - Number of decimal places
+ * @param fallback - Fallback string if value is invalid
+ */
+export function safeToFixed(
+  value: number | string | null | undefined,
+  decimals: number = 2,
+  fallback: string = '0.00'
+): string {
+  if (value == null) return fallback;
+  
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  
+  if (isNaN(num)) return fallback;
+  
+  try {
+    return num.toFixed(decimals);
+  } catch (error) {
+    console.error('Error formatting number with toFixed:', error);
+    return fallback;
+  }
+}
+
+/**
  * Safely formats a date
  * @param value - The date to format
  * @param fallback - Fallback string if value is invalid
@@ -173,3 +244,73 @@ export function safeStringify(
     return fallback;
   }
 }
+
+/**
+ * Safely handle array operations to prevent errors from undefined arrays
+ */
+export const safeArray = {
+  map<T, U>(arr: T[] | null | undefined, callback: (item: T, index: number) => U, fallback: U[] = []): U[] {
+    if (!Array.isArray(arr)) return fallback;
+    try {
+      return arr.map(callback);
+    } catch (error) {
+      console.error('Error in safeArray.map:', error);
+      return fallback;
+    }
+  },
+  
+  filter<T>(arr: T[] | null | undefined, predicate: (item: T) => boolean, fallback: T[] = []): T[] {
+    if (!Array.isArray(arr)) return fallback;
+    try {
+      return arr.filter(predicate);
+    } catch (error) {
+      console.error('Error in safeArray.filter:', error);
+      return fallback;
+    }
+  },
+  
+  find<T>(arr: T[] | null | undefined, predicate: (item: T) => boolean, fallback?: T): T | undefined {
+    if (!Array.isArray(arr)) return fallback;
+    try {
+      return arr.find(predicate) ?? fallback;
+    } catch (error) {
+      console.error('Error in safeArray.find:', error);
+      return fallback;
+    }
+  },
+  
+  some<T>(arr: T[] | null | undefined, predicate: (item: T) => boolean, fallback: boolean = false): boolean {
+    if (!Array.isArray(arr)) return fallback;
+    try {
+      return arr.some(predicate);
+    } catch (error) {
+      console.error('Error in safeArray.some:', error);
+      return fallback;
+    }
+  },
+  
+  every<T>(arr: T[] | null | undefined, predicate: (item: T) => boolean, fallback: boolean = true): boolean {
+    if (!Array.isArray(arr)) return fallback;
+    try {
+      return arr.every(predicate);
+    } catch (error) {
+      console.error('Error in safeArray.every:', error);
+      return fallback;
+    }
+  },
+  
+  reduce<T, U>(arr: T[] | null | undefined, callback: (acc: U, item: T) => U, initialValue: U): U {
+    if (!Array.isArray(arr)) return initialValue;
+    try {
+      return arr.reduce(callback, initialValue);
+    } catch (error) {
+      console.error('Error in safeArray.reduce:', error);
+      return initialValue;
+    }
+  },
+  
+  get<T>(arr: T[] | null | undefined, index: number, fallback?: T): T | undefined {
+    if (!Array.isArray(arr) || index < 0 || index >= arr.length) return fallback;
+    return arr[index] ?? fallback;
+  }
+};

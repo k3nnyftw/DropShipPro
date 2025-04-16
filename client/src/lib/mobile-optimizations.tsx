@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+// Import the updated hook
 import { useMobile } from '@/hooks/use-mobile';
 
 /**
