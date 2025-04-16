@@ -28,6 +28,9 @@ const ProductDescriptionGeneratorPage = lazyImportDefault(() => import("@/pages/
 const EmailMarketingPage = lazyImportDefault(() => import("@/pages/email-marketing"));
 const SocialSharingPage = lazyImportDefault(() => import("@/pages/social-sharing"));
 
+// Examples and demos
+const MobileOptimizationDemo = lazyImportDefault(() => import("@/components/examples/mobile-optimization-demo"));
+
 // Suspense fallback loading component
 const PageLoader = () => (
   <div className="flex h-[75vh] w-full items-center justify-center" aria-label="Loading page content">
@@ -81,6 +84,7 @@ function AppContent() {
     'o': () => navigate('/orders'),
     'a': () => navigate('/advertising'),
     'u': () => navigate('/automation'),
+    'm': () => navigate('/mobile-optimization-demo'),
     'escape': () => document.activeElement instanceof HTMLElement && document.activeElement.blur(),
   };
   
@@ -107,6 +111,7 @@ function AppContent() {
                   <Route path="/product-description-generator" component={ProductDescriptionGeneratorPage} />
                   <Route path="/email-marketing" component={EmailMarketingPage} />
                   <Route path="/social-sharing" component={SocialSharingPage} />
+                  <Route path="/mobile-optimization-demo" component={MobileOptimizationDemo} />
                   <Route component={NotFound} />
                 </Switch>
               </Suspense>
