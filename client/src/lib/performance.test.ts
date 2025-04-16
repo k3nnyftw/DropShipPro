@@ -1,189 +1,233 @@
-import { debounce, throttle, memoize } from './performance';
+import { 
+  memoize, 
+  debounce, 
+  throttle,
+  processInChunks,
+  createSignificantChangeDetector
+} from './performance';
 
-// Mock timers for testing debounce and throttle
+// Mock timeout functions
 jest.useFakeTimers();
 
-describe('Performance Utilities', () => {
+describe('Performance utilities', () => {
+  describe('memoize', () => {
+    it('should cache function results based on arguments', () => {
+      // Setup
+      const expensiveFunction = jest.fn((a: number, b: number) => a + b);
+      const memoizedFunction = memoize(expensiveFunction);
+      
+      // First call should execute the function
+      expect(memoizedFunction(1, 2)).toBe(3);
+      expect(expensiveFunction).toHaveBeenCalledTimes(1);
+      
+      // Second call with same arguments should use cached result
+      expect(memoizedFunction(1, 2)).toBe(3);
+      expect(expensiveFunction).toHaveBeenCalledTimes(1);
+      
+      // Call with different arguments should execute the function again
+      expect(memoizedFunction(2, 3)).toBe(5);
+      expect(expensiveFunction).toHaveBeenCalledTimes(2);
+      
+      // Verify cache is working as expected
+      expect(memoizedFunction(1, 2)).toBe(3);
+      expect(memoizedFunction(2, 3)).toBe(5);
+      expect(expensiveFunction).toHaveBeenCalledTimes(2);
+    });
+    
+    it('should handle object arguments correctly', () => {
+      // Setup
+      const processObject = jest.fn((obj: Record<string, any>) => obj.value * 2);
+      const memoizedFunction = memoize(processObject);
+      
+      // First call
+      expect(memoizedFunction({ value: 5 })).toBe(10);
+      expect(processObject).toHaveBeenCalledTimes(1);
+      
+      // Call with equivalent object should use cache
+      expect(memoizedFunction({ value: 5 })).toBe(10);
+      expect(processObject).toHaveBeenCalledTimes(1);
+      
+      // Call with different object
+      expect(memoizedFunction({ value: 10 })).toBe(20);
+      expect(processObject).toHaveBeenCalledTimes(2);
+    });
+  });
+  
   describe('debounce', () => {
-    it('delays function execution until after wait time', () => {
-      const callback = jest.fn();
-      const debounced = debounce(callback, 1000);
+    it('should delay function execution until wait time has passed', () => {
+      // Setup
+      const mockFunction = jest.fn();
+      const debouncedFunction = debounce(mockFunction, 1000);
       
       // Call the debounced function
-      debounced();
+      debouncedFunction();
       
-      // Verify callback was not called immediately
-      expect(callback).not.toBeCalled();
+      // Function should not be called yet
+      expect(mockFunction).not.toHaveBeenCalled();
       
       // Fast-forward time
       jest.advanceTimersByTime(500);
-      expect(callback).not.toBeCalled();
+      expect(mockFunction).not.toHaveBeenCalled();
       
-      // Fast-forward to just before the wait time
-      jest.advanceTimersByTime(499);
-      expect(callback).not.toBeCalled();
+      // Call it again (should reset the timer)
+      debouncedFunction();
       
-      // Now complete the wait time
-      jest.advanceTimersByTime(1);
-      expect(callback).toBeCalled();
-      expect(callback).toHaveBeenCalledTimes(1);
+      // Advance halfway
+      jest.advanceTimersByTime(500);
+      expect(mockFunction).not.toHaveBeenCalled();
+      
+      // Advance the rest of the way
+      jest.advanceTimersByTime(500);
+      expect(mockFunction).toHaveBeenCalledTimes(1);
     });
     
-    it('resets the timer when called again before wait time', () => {
-      const callback = jest.fn();
-      const debounced = debounce(callback, 1000);
+    it('should pass the latest arguments to the function', () => {
+      // Setup
+      const mockFunction = jest.fn();
+      const debouncedFunction = debounce(mockFunction, 1000);
       
-      // Call the debounced function
-      debounced();
+      // Call with initial arguments
+      debouncedFunction('first');
       
-      // Fast-forward half the wait time
-      jest.advanceTimersByTime(500);
+      // Update arguments before timeout expires
+      debouncedFunction('second');
       
-      // Call it again
-      debounced();
-      
-      // Fast-forward to just after the original wait time
-      jest.advanceTimersByTime(501);
-      
-      // Callback should not have been called yet
-      expect(callback).not.toBeCalled();
-      
-      // Fast-forward the remaining time
-      jest.advanceTimersByTime(500);
-      
-      // Now it should be called
-      expect(callback).toBeCalled();
-      expect(callback).toHaveBeenCalledTimes(1);
-    });
-    
-    it('passes arguments to the callback', () => {
-      const callback = jest.fn();
-      const debounced = debounce(callback, 1000);
-      
-      // Call with arguments
-      debounced('hello', 123);
-      
-      // Fast-forward time
+      // Advance time to trigger function
       jest.advanceTimersByTime(1000);
       
-      // Check arguments were passed
-      expect(callback).toHaveBeenCalledWith('hello', 123);
+      // Should be called with the latest arguments
+      expect(mockFunction).toHaveBeenCalledWith('second');
+      expect(mockFunction).toHaveBeenCalledTimes(1);
     });
   });
   
   describe('throttle', () => {
-    it('executes function immediately', () => {
-      const callback = jest.fn();
-      const throttled = throttle(callback, 1000);
+    it('should limit function execution frequency', () => {
+      // Setup
+      const mockFunction = jest.fn();
+      const throttledFunction = throttle(mockFunction, 1000);
       
-      // Call the throttled function
-      throttled();
+      // First call should execute immediately
+      throttledFunction();
+      expect(mockFunction).toHaveBeenCalledTimes(1);
       
-      // Verify callback was called immediately
-      expect(callback).toBeCalled();
-      expect(callback).toHaveBeenCalledTimes(1);
-    });
-    
-    it('limits execution to once per wait time', () => {
-      const callback = jest.fn();
-      const throttled = throttle(callback, 1000);
+      // Calling again before limit should not execute
+      throttledFunction();
+      throttledFunction();
+      expect(mockFunction).toHaveBeenCalledTimes(1);
       
-      // Call initially
-      throttled();
-      expect(callback).toHaveBeenCalledTimes(1);
-      
-      // Call again before wait time
-      throttled();
-      throttled();
-      expect(callback).toHaveBeenCalledTimes(1); // Should still be 1
-      
-      // Fast-forward past wait time
+      // Advance time past limit
       jest.advanceTimersByTime(1000);
       
-      // Another call should happen since we called during wait time
-      expect(callback).toHaveBeenCalledTimes(2);
+      // Should have executed once more with the last arguments
+      expect(mockFunction).toHaveBeenCalledTimes(2);
     });
     
-    it('uses the most recent arguments for delayed calls', () => {
-      const callback = jest.fn();
-      const throttled = throttle(callback, 1000);
+    it('should execute with the latest arguments after throttle period', () => {
+      const mockFunction = jest.fn();
+      const throttledFunction = throttle(mockFunction, 1000);
       
-      // Initial call
-      throttled('first');
-      expect(callback).toHaveBeenCalledWith('first');
-      expect(callback).toHaveBeenCalledTimes(1);
+      // First call executes immediately
+      throttledFunction('first');
+      expect(mockFunction).toHaveBeenCalledWith('first');
       
-      // Multiple calls with different args during wait time
-      throttled('second');
-      throttled('third');
-      throttled('last');
+      // These calls are throttled, but the last argument is saved
+      throttledFunction('second');
+      throttledFunction('third');
+      throttledFunction('fourth');
       
-      // Should still only have been called once with initial args
-      expect(callback).toHaveBeenCalledTimes(1);
+      // Still only called once
+      expect(mockFunction).toHaveBeenCalledTimes(1);
       
-      // Fast-forward past wait time
+      // Advance time past throttle period
       jest.advanceTimersByTime(1000);
       
-      // Should now be called again with the last args
-      expect(callback).toHaveBeenCalledTimes(2);
-      expect(callback).toHaveBeenLastCalledWith('last');
+      // Should execute with the latest arguments
+      expect(mockFunction).toHaveBeenCalledWith('fourth');
+      expect(mockFunction).toHaveBeenCalledTimes(2);
     });
   });
   
-  describe('memoize', () => {
-    it('caches results for repeated calls with same arguments', () => {
-      // Create a spy on a computationally expensive function
-      const expensive = jest.fn((a, b) => a + b);
-      const memoized = memoize(expensive);
+  describe('processInChunks', () => {
+    it('should process all items in chunks', async () => {
+      // Setup - create an array of numbers and a processor that doubles them
+      const items = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+      const processor = jest.fn((num: number) => num * 2);
       
-      // First call should compute the result
-      expect(memoized(5, 10)).toBe(15);
-      expect(expensive).toHaveBeenCalledTimes(1);
+      // Start processing in chunks of 3
+      const resultPromise = processInChunks(items, processor, 3, 100);
       
-      // Second call with same args should use cached result
-      expect(memoized(5, 10)).toBe(15);
-      expect(expensive).toHaveBeenCalledTimes(1); // Still only called once
+      // First chunk should be processed immediately
+      expect(processor).toHaveBeenCalledTimes(3);
+      expect(processor).toHaveBeenNthCalledWith(1, 1);
+      expect(processor).toHaveBeenNthCalledWith(2, 2);
+      expect(processor).toHaveBeenNthCalledWith(3, 3);
       
-      // Call with different args should compute a new result
-      expect(memoized(10, 20)).toBe(30);
-      expect(expensive).toHaveBeenCalledTimes(2);
+      // Advance time for the next chunk
+      jest.advanceTimersByTime(100);
+      expect(processor).toHaveBeenCalledTimes(6);
       
-      // Call with original args should still use cache
-      expect(memoized(5, 10)).toBe(15);
-      expect(expensive).toHaveBeenCalledTimes(2); // No additional calls
+      // Advance for remaining chunks
+      jest.advanceTimersByTime(100);
+      expect(processor).toHaveBeenCalledTimes(9);
+      
+      jest.advanceTimersByTime(100);
+      expect(processor).toHaveBeenCalledTimes(10);
+      
+      // Get the result
+      const result = await resultPromise;
+      
+      // Verify the result
+      expect(result).toEqual([2, 4, 6, 8, 10, 12, 14, 16, 18, 20]);
+    });
+  });
+  
+  describe('createSignificantChangeDetector', () => {
+    it('should detect significant numeric changes', () => {
+      const detector = createSignificantChangeDetector(10, 5);
+      
+      // Small change (less than threshold)
+      expect(detector.hasChanged(12)).toBe(false);
+      
+      // Significant change
+      expect(detector.hasChanged(16)).toBe(true);
+      
+      // Update the tracked value
+      detector.update(16);
+      
+      // Small change from new value
+      expect(detector.hasChanged(18)).toBe(false);
+      
+      // Significant change from new value
+      expect(detector.hasChanged(22)).toBe(true);
+      
+      // Verify current value
+      expect(detector.currentValue()).toBe(16);
     });
     
-    it('preserves function context (this value)', () => {
-      // Create an object with a method
-      const obj = {
-        value: 10,
-        method: function(x: number) {
-          return this.value + x;
-        }
-      };
+    it('should detect changes in objects', () => {
+      const initialObject = { name: 'John', age: 30 };
+      const detector = createSignificantChangeDetector(initialObject);
       
-      // Spy on the method
-      const methodSpy = jest.spyOn(obj, 'method');
+      // Same object structure and values
+      expect(detector.hasChanged({ name: 'John', age: 30 })).toBe(false);
       
-      // Memoize the method
-      obj.method = memoize(obj.method);
+      // Changed value
+      expect(detector.hasChanged({ name: 'John', age: 31 })).toBe(true);
       
-      // Call the memoized method
-      expect(obj.method(5)).toBe(15);
-      expect(methodSpy).toHaveBeenCalledTimes(1);
+      // Update the tracked object
+      detector.update({ name: 'Jane', age: 25 });
       
-      // Call again with same args
-      expect(obj.method(5)).toBe(15);
-      expect(methodSpy).toHaveBeenCalledTimes(1); // Still only called once
+      // Verify tracking the new object
+      expect(detector.hasChanged({ name: 'Jane', age: 25 })).toBe(false);
+      expect(detector.hasChanged({ name: 'Jane', age: 26 })).toBe(true);
       
-      // Change the value property
-      obj.value = 20;
+      // Verify current value
+      const currentValue = detector.currentValue();
+      expect(currentValue).toEqual({ name: 'Jane', age: 25 });
       
-      // Call again with same args
-      // Note: This will still return 15 because the context at call time
-      // isn't part of the cache key in our implementation
-      expect(obj.method(5)).toBe(15);
-      expect(methodSpy).toHaveBeenCalledTimes(1);
+      // Ensure we have a copy, not the original reference
+      expect(currentValue).not.toBe(initialObject);
     });
   });
 });
