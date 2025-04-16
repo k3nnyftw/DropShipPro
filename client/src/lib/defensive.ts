@@ -1,316 +1,497 @@
 /**
- * Defensive programming utilities to handle null/undefined values
- * and prevent runtime errors throughout the application
+ * Defensive programming utilities for error prevention
+ * These utilities help protect against common programming errors
  */
 
+// Global error handler for uncaught errors
+export function globalErrorHandler(error: Error): void {
+  console.error('Uncaught error:', error);
+  
+  // Here you might also send the error to a monitoring service like Sentry
+  // sendErrorToMonitoring(error);
+}
+
 /**
- * Global error handler for unhandled exceptions
- * @param error - The error that occurred
- * @param errorInfo - Additional error info (from React error boundaries)
+ * Safely access nested object properties without throwing errors
+ * @param obj - Object to access properties from
+ * @param path - Path to the property as a dot-separated string
+ * @param defaultValue - Value to return if the property doesn't exist
+ * @returns The value at the path or the default value
  */
-export function globalErrorHandler(error: Error, errorInfo?: React.ErrorInfo): void {
-  // Log to console for development
-  console.error('Unhandled error:', error);
-  if (errorInfo) {
-    console.error('Component stack trace:', errorInfo.componentStack);
+export function safeGet<T = any>(
+  obj: Record<string, any> | null | undefined, 
+  path: string, 
+  defaultValue: T
+): T {
+  if (obj == null) return defaultValue;
+  
+  const parts = path.split('.');
+  let current: any = obj;
+  
+  for (const part of parts) {
+    if (current == null || typeof current !== 'object') {
+      return defaultValue;
+    }
+    current = current[part];
   }
   
-  // In production, you would send error to monitoring service
-  if (process.env.NODE_ENV === 'production') {
-    // This would be replaced with actual error reporting integration
+  return current !== undefined ? current : defaultValue;
+}
+
+/**
+ * Safely convert value to number
+ * @param value - Value to convert
+ * @param defaultValue - Default value if conversion fails
+ * @returns Converted number or default value
+ */
+export function safeNumber(value: any, defaultValue: number = 0): number {
+  if (value === null || value === undefined) return defaultValue;
+  
+  const converted = Number(value);
+  return isNaN(converted) ? defaultValue : converted;
+}
+
+/**
+ * Safely convert value to boolean
+ * @param value - Value to convert
+ * @param defaultValue - Default value if conversion is uncertain
+ * @returns Converted boolean or default value
+ */
+export function safeBoolean(value: any, defaultValue: boolean = false): boolean {
+  if (value === null || value === undefined) return defaultValue;
+  
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'string') {
+    const lowered = value.toLowerCase();
+    if (lowered === 'true' || lowered === 'yes' || lowered === '1') return true;
+    if (lowered === 'false' || lowered === 'no' || lowered === '0') return false;
+  }
+  if (typeof value === 'number') {
+    if (value === 1) return true;
+    if (value === 0) return false;
+  }
+  
+  return defaultValue;
+}
+
+/**
+ * Safely convert value to date
+ * @param value - Value to convert
+ * @param defaultValue - Default value if conversion fails
+ * @returns Converted date or default value
+ */
+export function safeDate(value: any, defaultValue: Date = new Date()): Date {
+  if (value instanceof Date) return value;
+  
+  if (value) {
     try {
-      // Sample code for error reporting (this would be replaced with real service)
-      const errorReport = {
-        message: error.message,
-        name: error.name,
-        stack: error.stack,
-        componentStack: errorInfo?.componentStack,
-        timestamp: new Date().toISOString(),
-        url: window.location.href,
-        userAgent: navigator.userAgent
-      };
-      
-      // Would send to error monitoring service in production
-      console.info('Error report prepared:', errorReport);
-      
-      // Show user-friendly toast notification
-      // You would use your toast notification system here
-    } catch (reportingError) {
-      // Fail silently if error reporting itself fails
-      console.error('Error while reporting error:', reportingError);
+      const date = new Date(value);
+      return isNaN(date.getTime()) ? defaultValue : date;
+    } catch (e) {
+      return defaultValue;
     }
+  }
+  
+  return defaultValue;
+}
+
+/**
+ * Safely trim a string
+ * @param value - Value to trim
+ * @param defaultValue - Default value if value is not a string
+ * @returns Trimmed string or default value
+ */
+export function safeTrim(value: any, defaultValue: string = ''): string {
+  if (typeof value === 'string') return value.trim();
+  if (value === null || value === undefined) return defaultValue;
+  
+  try {
+    return String(value).trim();
+  } catch (e) {
+    return defaultValue;
   }
 }
 
 /**
- * Type guard to check if value is defined (not null or undefined)
+ * Safely execute a function without throwing errors
+ * @param fn - Function to execute
+ * @param defaultValue - Value to return if function throws
+ * @param args - Arguments to pass to the function
+ * @returns Result of function or default value
+ */
+export function safeExecute<T, Args extends any[]>(
+  fn: (...args: Args) => T,
+  defaultValue: T,
+  ...args: Args
+): T {
+  try {
+    return fn(...args);
+  } catch (e) {
+    console.error('Error executing function:', e);
+    return defaultValue;
+  }
+}
+
+/**
+ * Safe array operations - prevent common array-related errors
+ */
+export const safeArray = {
+  /**
+   * Safely get an element from an array
+   * @param arr - Array to get element from
+   * @param index - Index of the element
+   * @param defaultValue - Default value if index is out of bounds
+   * @returns Element at index or default value
+   */
+  get<T>(arr: T[] | null | undefined, index: number, defaultValue: T): T {
+    if (!Array.isArray(arr) || index < 0 || index >= arr.length) {
+      return defaultValue;
+    }
+    return arr[index] === undefined || arr[index] === null ? defaultValue : arr[index]!;
+  },
+  
+  /**
+   * Safely get the first element of an array
+   * @param arr - Array to get first element from
+   * @param defaultValue - Default value if array is empty
+   * @returns First element or default value
+   */
+  first<T>(arr: T[] | null | undefined, defaultValue: T): T {
+    return this.get(arr, 0, defaultValue);
+  },
+  
+  /**
+   * Safely get the last element of an array
+   * @param arr - Array to get last element from
+   * @param defaultValue - Default value if array is empty
+   * @returns Last element or default value
+   */
+  last<T>(arr: T[] | null | undefined, defaultValue: T): T {
+    if (!Array.isArray(arr) || arr.length === 0) {
+      return defaultValue;
+    }
+    return this.get(arr, arr.length - 1, defaultValue);
+  },
+  
+  /**
+   * Check if an array contains a specific value
+   * @param arr - Array to check
+   * @param value - Value to look for
+   * @returns Whether the array contains the value
+   */
+  includes<T>(arr: T[] | null | undefined, value: T): boolean {
+    return Array.isArray(arr) && arr.includes(value);
+  },
+  
+  /**
+   * Safely map over an array without throwing errors
+   * @param arr - Array to map
+   * @param mapFn - Mapping function
+   * @returns Mapped array or empty array if input is not an array
+   */
+  map<T, U>(arr: T[] | null | undefined, mapFn: (item: T, index: number) => U): U[] {
+    if (!Array.isArray(arr)) return [];
+    
+    const result: U[] = [];
+    for (let i = 0; i < arr.length; i++) {
+      try {
+        result.push(mapFn(arr[i], i));
+      } catch (e) {
+        console.error(`Error mapping array item at index ${i}:`, e);
+      }
+    }
+    return result;
+  },
+  
+  /**
+   * Safely filter an array without throwing errors
+   * @param arr - Array to filter
+   * @param filterFn - Filter function
+   * @returns Filtered array or empty array if input is not an array
+   */
+  filter<T>(arr: T[] | null | undefined, filterFn: (item: T, index: number) => boolean): T[] {
+    if (!Array.isArray(arr)) return [];
+    
+    const result: T[] = [];
+    for (let i = 0; i < arr.length; i++) {
+      try {
+        if (filterFn(arr[i], i)) {
+          result.push(arr[i]);
+        }
+      } catch (e) {
+        console.error(`Error filtering array item at index ${i}:`, e);
+      }
+    }
+    return result;
+  },
+  
+  /**
+   * Create a new array with the specified length and fill value
+   * @param length - Length of the array
+   * @param fillValue - Value to fill the array with
+   * @returns New array
+   */
+  create<T>(length: number, fillValue: T): T[] {
+    const safeLength = Math.max(0, Math.floor(safeNumber(length, 0)));
+    return Array(safeLength).fill(fillValue);
+  },
+  
+  /**
+   * Safely join array elements into a string
+   * @param arr - Array to join
+   * @param separator - Separator to use
+   * @returns Joined string or empty string if input is not an array
+   */
+  join(arr: any[] | null | undefined, separator: string = ','): string {
+    if (!Array.isArray(arr)) return '';
+    
+    return arr
+      .map(item => (item === null || item === undefined ? '' : String(item)))
+      .join(separator);
+  },
+  
+  /**
+   * Safely reduce an array without throwing errors
+   * @param arr - Array to reduce
+   * @param reduceFn - Reduce function
+   * @param initialValue - Initial value
+   * @returns Reduced value
+   */
+  reduce<T, U>(
+    arr: T[] | null | undefined, 
+    reduceFn: (accumulator: U, item: T, index: number) => U, 
+    initialValue: U
+  ): U {
+    if (!Array.isArray(arr)) return initialValue;
+    
+    let result = initialValue;
+    for (let i = 0; i < arr.length; i++) {
+      try {
+        result = reduceFn(result, arr[i], i);
+      } catch (e) {
+        console.error(`Error reducing array item at index ${i}:`, e);
+      }
+    }
+    return result;
+  },
+  
+  /**
+   * Safely slice an array without throwing errors
+   * @param arr - Array to slice
+   * @param start - Start index
+   * @param end - End index
+   * @returns Sliced array or empty array if input is not an array
+   */
+  slice<T>(arr: T[] | null | undefined, start?: number, end?: number): T[] {
+    if (!Array.isArray(arr)) return [];
+    
+    try {
+      return arr.slice(start, end);
+    } catch (e) {
+      console.error('Error slicing array:', e);
+      return [];
+    }
+  },
+  
+  /**
+   * Sort an array using a stable sorting algorithm
+   * @param arr - Array to sort
+   * @param compareFn - Compare function
+   * @returns Sorted array or empty array if input is not an array
+   */
+  sort<T>(
+    arr: T[] | null | undefined, 
+    compareFn?: (a: T, b: T) => number
+  ): T[] {
+    if (!Array.isArray(arr)) return [];
+    
+    try {
+      // Create a copy to avoid mutating the original array
+      const copy = [...arr];
+      return copy.sort(compareFn);
+    } catch (e) {
+      console.error('Error sorting array:', e);
+      return Array.isArray(arr) ? [...arr] : [];
+    }
+  },
+  
+  /**
+   * Safely return a unique set of array elements
+   * @param arr - Array to deduplicate
+   * @returns Deduplicated array or empty array if input is not an array
+   */
+  unique<T>(arr: T[] | null | undefined): T[] {
+    if (!Array.isArray(arr)) return [];
+    
+    try {
+      // Manual deduplication to avoid Set iteration issues in older browsers
+      const result: T[] = [];
+      const seen = new Set<string>();
+      
+      for (const item of arr) {
+        // Use string representation for uniqueness check
+        const key = typeof item === 'object' && item !== null
+          ? JSON.stringify(item)
+          : String(item);
+          
+        if (!seen.has(key)) {
+          seen.add(key);
+          result.push(item);
+        }
+      }
+      
+      return result;
+    } catch (e) {
+      console.error('Error deduplicating array:', e);
+      return Array.isArray(arr) ? [...arr] : [];
+    }
+  }
+};
+
+/**
+ * Convert any value to a string array
+ * @param value - Value to convert (string, array, or any other type)
+ * @param separator - Separator to use if value is a string
+ * @returns String array
+ */
+export function toStringArray(
+  value: string | string[] | any[] | null | undefined,
+  separator: string = ','
+): string[] {
+  if (value === null || value === undefined) {
+    return [];
+  }
+  
+  if (Array.isArray(value)) {
+    return value.map(item => (item === null || item === undefined ? '' : String(item)));
+  }
+  
+  if (typeof value === 'string') {
+    return value.split(separator).map(s => s.trim()).filter(Boolean);
+  }
+  
+  return [String(value)];
+}
+
+/**
+ * Create a promise that will be rejected after the specified timeout
+ * @param ms - Timeout in milliseconds
+ * @param message - Error message
+ * @returns Promise that rejects after timeout
+ */
+export function createTimeoutPromise(ms: number, message: string = 'Operation timed out'): Promise<never> {
+  return new Promise((_, reject) => {
+    setTimeout(() => reject(new Error(message)), ms);
+  });
+}
+
+/**
+ * Execute a promise with a timeout
+ * @param promise - Promise to execute
+ * @param timeoutMs - Timeout in milliseconds
+ * @param timeoutMessage - Error message on timeout
+ * @returns Promise result or timeout error
+ */
+export function promiseWithTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string = 'Operation timed out'
+): Promise<T> {
+  return Promise.race([
+    promise,
+    createTimeoutPromise(timeoutMs, timeoutMessage)
+  ]);
+}
+
+/**
+ * Retry a function multiple times with exponential backoff
+ * @param fn - Function to retry
+ * @param maxRetries - Maximum number of retries
+ * @param baseDelayMs - Base delay in milliseconds
+ * @returns Promise with the function result
+ */
+export async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelayMs: number = 300
+): Promise<T> {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+      
+      if (attempt < maxRetries) {
+        const delay = baseDelayMs * Math.pow(2, attempt);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError || new Error('Operation failed after retries');
+}
+
+/**
+ * Type guard to check if a value is not null or undefined
+ * @param value - Value to check
+ * @returns Whether the value is defined
  */
 export function isDefined<T>(value: T | null | undefined): value is T {
   return value !== null && value !== undefined;
 }
 
 /**
- * Safely access a potentially undefined/null object property
- * @param obj - The object to access
- * @param key - The property key to access
- * @param fallback - Fallback value if property is undefined/null
+ * Type guard to check if a value is a non-empty string
+ * @param value - Value to check
+ * @returns Whether the value is a non-empty string
  */
-export function safeGet<T, K extends keyof T>(
-  obj: T | null | undefined,
-  key: K,
-  fallback: T[K]
-): T[K] {
-  if (obj == null) return fallback;
-  return obj[key] ?? fallback;
+export function isNonEmptyString(value: any): value is string {
+  return typeof value === 'string' && value.trim() !== '';
 }
 
 /**
- * Safely call a method on a potentially undefined/null object
- * @param obj - The object containing the method
- * @param method - The method name to call
- * @param args - Arguments to pass to the method
- * @param fallback - Fallback value if method can't be called
+ * Type guard to check if a value is a number
+ * @param value - Value to check
+ * @returns Whether the value is a number
  */
-export function safeCall<T, K extends keyof T, R>(
-  obj: T | null | undefined,
-  method: K,
-  args: any[] = [],
-  fallback: R
-): R {
-  if (obj == null) return fallback;
-  const fn = obj[method];
-  if (typeof fn !== 'function') return fallback;
-  try {
-    return fn.apply(obj, args) as R;
-  } catch (error) {
-    console.error(`Error calling ${String(method)}:`, error);
-    return fallback;
-  }
+export function isNumber(value: any): value is number {
+  return typeof value === 'number' && !isNaN(value);
 }
 
 /**
- * Safely access a nested property on a potentially undefined/null object
- * @param obj - The root object
- * @param path - The path to the nested property (e.g. "user.address.street")
- * @param fallback - Fallback value if any part of the path is undefined/null
+ * Type guard to check if a value is a valid date
+ * @param value - Value to check
+ * @returns Whether the value is a valid date
  */
-export function safeGetNested<T>(
-  obj: any,
-  path: string,
-  fallback: T
-): T {
-  if (obj == null) return fallback;
-  
-  const parts = path.split('.');
-  let current = obj;
-  
-  for (const part of parts) {
-    if (current == null || typeof current !== 'object') {
-      return fallback;
-    }
-    current = current[part];
-  }
-  
-  return current ?? fallback;
+export function isValidDate(value: any): value is Date {
+  return value instanceof Date && !isNaN(value.getTime());
 }
 
 /**
- * Safely formats a number with toLocaleString
- * @param value - The number to format
- * @param fallback - Fallback string if value is invalid
- * @param options - Locale string options
+ * Type guard to check if a value is an array
+ * @param value - Value to check
+ * @returns Whether the value is an array
  */
-export function safeFormatNumber(
-  value: number | string | null | undefined,
-  fallback: string = '0',
-  options?: Intl.NumberFormatOptions
-): string {
-  if (value == null) return fallback;
-  
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  
-  if (isNaN(num)) return fallback;
-  
-  try {
-    return num.toLocaleString(undefined, options);
-  } catch (error) {
-    console.error('Error formatting number:', error);
-    return fallback;
-  }
+export function isArray<T>(value: any): value is T[] {
+  return Array.isArray(value);
 }
 
 /**
- * Safely format a number to a specific number of decimal places
- * @param value - The number to format
- * @param decimals - Number of decimal places
- * @param fallback - Fallback string if value is invalid
+ * Type guard to check if a value is an object
+ * @param value - Value to check
+ * @returns Whether the value is an object
  */
-export function safeToFixed(
-  value: number | string | null | undefined,
-  decimals: number = 2,
-  fallback: string = '0.00'
-): string {
-  if (value == null) return fallback;
-  
-  const num = typeof value === 'string' ? parseFloat(value) : value;
-  
-  if (isNaN(num)) return fallback;
-  
-  try {
-    return num.toFixed(decimals);
-  } catch (error) {
-    console.error('Error formatting number with toFixed:', error);
-    return fallback;
-  }
+export function isObject(value: any): value is Record<string, any> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 /**
- * Safely formats a date
- * @param value - The date to format
- * @param fallback - Fallback string if value is invalid
- * @param options - Date format options
+ * Type guard to check if a value is a function
+ * @param value - Value to check
+ * @returns Whether the value is a function
  */
-export function safeFormatDate(
-  value: Date | string | number | null | undefined,
-  fallback: string = 'N/A',
-  options?: Intl.DateTimeFormatOptions
-): string {
-  if (value == null) return fallback;
-  
-  try {
-    const date = value instanceof Date ? value : new Date(value);
-    
-    // Check if date is valid
-    if (isNaN(date.getTime())) return fallback;
-    
-    return date.toLocaleString(undefined, options);
-  } catch (error) {
-    console.error('Error formatting date:', error);
-    return fallback;
-  }
+export function isFunction(value: any): value is Function {
+  return typeof value === 'function';
 }
-
-/**
- * Safely executes a function, catching any errors
- * @param fn - The function to execute
- * @param fallback - Fallback value if function throws
- * @param args - Arguments to pass to the function
- */
-export function safeExecute<T>(
-  fn: (...args: any[]) => T,
-  fallback: T,
-  ...args: any[]
-): T {
-  try {
-    return fn(...args);
-  } catch (error) {
-    console.error('Error executing function:', error);
-    return fallback;
-  }
-}
-
-/**
- * Safely parse JSON from a string
- * @param jsonString - The JSON string to parse
- * @param fallback - Fallback value if parsing fails
- */
-export function safeParseJson<T>(
-  jsonString: string | null | undefined,
-  fallback: T
-): T {
-  if (jsonString == null) return fallback;
-  
-  try {
-    return JSON.parse(jsonString) as T;
-  } catch (error) {
-    console.error('Error parsing JSON:', error);
-    return fallback;
-  }
-}
-
-/**
- * Safely stringify an object to JSON
- * @param value - The value to stringify
- * @param fallback - Fallback string if stringification fails
- */
-export function safeStringify(
-  value: any,
-  fallback: string = '{}'
-): string {
-  try {
-    return JSON.stringify(value);
-  } catch (error) {
-    console.error('Error stringifying value:', error);
-    return fallback;
-  }
-}
-
-/**
- * Safely handle array operations to prevent errors from undefined arrays
- */
-export const safeArray = {
-  map<T, U>(arr: T[] | null | undefined, callback: (item: T, index: number) => U, fallback: U[] = []): U[] {
-    if (!Array.isArray(arr)) return fallback;
-    try {
-      return arr.map(callback);
-    } catch (error) {
-      console.error('Error in safeArray.map:', error);
-      return fallback;
-    }
-  },
-  
-  filter<T>(arr: T[] | null | undefined, predicate: (item: T) => boolean, fallback: T[] = []): T[] {
-    if (!Array.isArray(arr)) return fallback;
-    try {
-      return arr.filter(predicate);
-    } catch (error) {
-      console.error('Error in safeArray.filter:', error);
-      return fallback;
-    }
-  },
-  
-  find<T>(arr: T[] | null | undefined, predicate: (item: T) => boolean, fallback?: T): T | undefined {
-    if (!Array.isArray(arr)) return fallback;
-    try {
-      return arr.find(predicate) ?? fallback;
-    } catch (error) {
-      console.error('Error in safeArray.find:', error);
-      return fallback;
-    }
-  },
-  
-  some<T>(arr: T[] | null | undefined, predicate: (item: T) => boolean, fallback: boolean = false): boolean {
-    if (!Array.isArray(arr)) return fallback;
-    try {
-      return arr.some(predicate);
-    } catch (error) {
-      console.error('Error in safeArray.some:', error);
-      return fallback;
-    }
-  },
-  
-  every<T>(arr: T[] | null | undefined, predicate: (item: T) => boolean, fallback: boolean = true): boolean {
-    if (!Array.isArray(arr)) return fallback;
-    try {
-      return arr.every(predicate);
-    } catch (error) {
-      console.error('Error in safeArray.every:', error);
-      return fallback;
-    }
-  },
-  
-  reduce<T, U>(arr: T[] | null | undefined, callback: (acc: U, item: T) => U, initialValue: U): U {
-    if (!Array.isArray(arr)) return initialValue;
-    try {
-      return arr.reduce(callback, initialValue);
-    } catch (error) {
-      console.error('Error in safeArray.reduce:', error);
-      return initialValue;
-    }
-  },
-  
-  get<T>(arr: T[] | null | undefined, index: number, fallback?: T): T | undefined {
-    if (!Array.isArray(arr) || index < 0 || index >= arr.length) return fallback;
-    return arr[index] ?? fallback;
-  }
-};
