@@ -1,217 +1,201 @@
 /**
- * Security utilities for client-side application security
- * These utilities help prevent common web vulnerabilities
+ * Security utilities for client-side protection
+ * These utilities help protect against common security issues in web applications
  */
 
 /**
- * Sanitizes HTML to prevent XSS attacks
- * Only use this for non-React content or when dangerouslySetInnerHTML is required
- * 
- * @param html - The HTML string to sanitize
- * @returns Safe HTML string
+ * Sanitizes a string to prevent XSS attacks
+ * @param input - String to sanitize
+ * @returns Sanitized string with potentially dangerous characters escaped
  */
-export function sanitizeHtml(html: string): string {
-  // Create a new DOM element
-  const tempElement = document.createElement('div');
-  tempElement.textContent = html;
+export function sanitizeHtml(input: string): string {
+  if (!input) return '';
   
-  // Return the sanitized HTML
-  return tempElement.innerHTML;
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 
 /**
- * Escapes a string for safe use in regular expressions
- * 
- * @param string - The string to escape
- * @returns Escaped string
+ * Creates a content security policy nonce for use with inline scripts
+ * @returns Random nonce string
  */
-export function escapeRegExp(string: string): string {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+export function generateNonce(): string {
+  // Generate random string for CSP nonce
+  const array = new Uint8Array(16);
+  window.crypto.getRandomValues(array);
+  return Array.from(array)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
 }
 
 /**
- * Validates an input based on a whitelist pattern
- * Useful for preventing injection attacks
- * 
- * @param input - The input to validate
- * @param pattern - Regex pattern to validate against
- * @returns Whether the input is valid
+ * Validates a URL to prevent open redirects
+ * @param url - URL to validate
+ * @param allowedDomains - List of allowed domains for external links
+ * @returns Whether the URL is safe
  */
-export function validateInput(input: string, pattern: RegExp): boolean {
-  return pattern.test(input);
-}
-
-/**
- * Validates email format
- * 
- * @param email - The email to validate
- * @returns Whether the email is valid
- */
-export function validateEmail(email: string): boolean {
-  const emailPattern = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-  return emailPattern.test(email);
-}
-
-/**
- * Validates password strength
- * 
- * @param password - The password to validate
- * @returns Object with validation result and reasons
- */
-export function validatePassword(password: string): {
-  isValid: boolean;
-  reasons: string[];
-} {
-  const reasons: string[] = [];
+export function isSafeUrl(url: string, allowedDomains: string[] = []): boolean {
+  if (!url) return false;
   
-  if (password.length < 8) {
-    reasons.push('Password must be at least 8 characters long');
-  }
-  
-  if (!/[A-Z]/.test(password)) {
-    reasons.push('Password must contain at least one uppercase letter');
-  }
-  
-  if (!/[a-z]/.test(password)) {
-    reasons.push('Password must contain at least one lowercase letter');
-  }
-  
-  if (!/[0-9]/.test(password)) {
-    reasons.push('Password must contain at least one number');
-  }
-  
-  if (!/[^A-Za-z0-9]/.test(password)) {
-    reasons.push('Password must contain at least one special character');
-  }
-  
-  return {
-    isValid: reasons.length === 0,
-    reasons,
-  };
-}
-
-/**
- * Checks if a token has expired
- * 
- * @param token - JWT token to check
- * @returns Whether the token has expired
- */
-export function isTokenExpired(token: string): boolean {
   try {
-    const base64Url = token.split('.')[1];
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
+    // Allow relative URLs
+    if (url.startsWith('/') && !url.startsWith('//')) {
+      return true;
+    }
+    
+    // Check for javascript: URLs
+    if (url.toLowerCase().startsWith('javascript:')) {
+      return false;
+    }
+    
+    // Check for data: URLs
+    if (url.toLowerCase().startsWith('data:')) {
+      return false;
+    }
+    
+    // Parse the URL to check against allowed domains
+    const parsedUrl = new URL(url);
+    
+    // Allow same origin
+    if (parsedUrl.origin === window.location.origin) {
+      return true;
+    }
+    
+    // Check against allowed external domains
+    return allowedDomains.some(domain => 
+      parsedUrl.hostname === domain || 
+      parsedUrl.hostname.endsWith(`.${domain}`)
     );
-    
-    const { exp } = JSON.parse(jsonPayload);
-    const expired = Date.now() >= exp * 1000;
-    
-    return expired;
   } catch (error) {
-    console.error('Error decoding token:', error);
-    return true; // Assume expired on error
+    // URL parsing failed - reject the URL
+    console.error('Invalid URL:', url, error);
+    return false;
   }
 }
 
 /**
- * Hashes a string using SHA-256
- * Useful for creating content hashes for integrity checks
- * 
- * @param message - The string to hash
- * @returns Promise resolving to hash
+ * Safely opens external links to prevent tab nabbing attacks
+ * @param url - URL to open
+ * @param allowedDomains - List of allowed domains for external links
+ * @returns Whether the URL was opened
  */
-export async function hashString(message: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(message);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return hashHex;
+export function safeOpenExternalLink(url: string, allowedDomains: string[] = []): boolean {
+  if (!isSafeUrl(url, allowedDomains)) {
+    console.error('Attempted to open unsafe URL:', url);
+    return false;
+  }
+  
+  // Open URL with security features enabled
+  window.open(url, '_blank', 'noopener,noreferrer');
+  return true;
 }
 
 /**
- * Securely stores data in localStorage with encryption
- * 
- * @param key - Storage key
- * @param value - Value to store
- * @param encryptionKey - Optional encryption key
+ * Sets security headers in fetch requests
+ * @param headers - Existing headers to extend
+ * @returns Headers with security enhancements
  */
-export function secureStore(
-  key: string,
-  value: any,
-  encryptionKey?: string
-): void {
+export function enhanceRequestHeaders(headers: HeadersInit = {}): Headers {
+  const enhancedHeaders = new Headers(headers);
+  
+  // Prevent MIME type sniffing
+  enhancedHeaders.set('X-Content-Type-Options', 'nosniff');
+  
+  // CSRF protection
+  if (document.cookie) {
+    const csrfToken = getCsrfToken();
+    if (csrfToken) {
+      enhancedHeaders.set('X-CSRF-Token', csrfToken);
+    }
+  }
+  
+  return enhancedHeaders;
+}
+
+/**
+ * Gets CSRF token from meta tag
+ * This assumes your backend sets a CSRF token in a meta tag named "csrf-token"
+ */
+function getCsrfToken(): string | null {
+  const metaTag = document.querySelector('meta[name="csrf-token"]');
+  return metaTag ? metaTag.getAttribute('content') : null;
+}
+
+/**
+ * Detects if the application is running in a secure context (HTTPS)
+ */
+export function isSecureContext(): boolean {
+  return window.isSecureContext;
+}
+
+/**
+ * Detects if the application is loaded in an iframe
+ * Used to prevent clickjacking
+ */
+export function isInIframe(): boolean {
   try {
-    // In a real app, we would encrypt this data
-    // For now, we'll just stringify it
-    const serialized = JSON.stringify(value);
-    localStorage.setItem(key, serialized);
-  } catch (error) {
-    console.error('Error storing data:', error);
+    return window !== window.top;
+  } catch (e) {
+    // If we can't access window.top, we're in a cross-origin iframe
+    return true;
   }
 }
 
 /**
- * Retrieves securely stored data from localStorage
- * 
- * @param key - Storage key
- * @param encryptionKey - Optional encryption key
- * @returns Retrieved value or null
+ * Prevents the application from running in iframes (clickjacking protection)
+ * Call this early in your application initialization
  */
-export function secureRetrieve<T>(
-  key: string,
-  encryptionKey?: string
-): T | null {
-  try {
-    const serialized = localStorage.getItem(key);
-    if (serialized === null) return null;
+export function preventFraming(): void {
+  if (isInIframe()) {
+    // Break out of the iframe if possible
+    try {
+      // TypeScript doesn't know that we've already checked this with isInIframe()
+      // Use non-null assertion with proper safeguards
+      const topWindow = window.top as Window;
+      topWindow.location.href = window.location.href;
+    } catch (e) {
+      // If we can't break out, show an error or redirect
+      document.body.innerHTML = '<h1>For security reasons, this application cannot run in an iframe.</h1>';
+    }
+  }
+}
+
+/**
+ * Rate limits a function to prevent abuse
+ * @param fn - Function to rate limit
+ * @param maxCalls - Maximum number of calls allowed in the time window
+ * @param timeWindow - Time window in milliseconds
+ * @returns Rate-limited function
+ */
+export function rateLimit<T extends (...args: any[]) => any>(
+  fn: T,
+  maxCalls: number = 5,
+  timeWindow: number = 1000
+): (...args: Parameters<T>) => ReturnType<T> | undefined {
+  const calls: number[] = [];
+  
+  return function(...args: Parameters<T>): ReturnType<T> | undefined {
+    const now = Date.now();
     
-    // In a real app, we would decrypt this data
-    // For now, we'll just parse it
-    return JSON.parse(serialized) as T;
-  } catch (error) {
-    console.error('Error retrieving data:', error);
-    return null;
-  }
-}
-
-/**
- * Securely removes data from localStorage
- * 
- * @param key - Storage key
- */
-export function secureRemove(key: string): void {
-  try {
-    localStorage.removeItem(key);
-  } catch (error) {
-    console.error('Error removing data:', error);
-  }
-}
-
-/**
- * Generates a Content Security Policy header value
- * For use in HTTP headers
- * 
- * @returns CSP header value
- */
-export function generateCSP(): string {
-  return `
-    default-src 'self';
-    script-src 'self' https://js.stripe.com;
-    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-    img-src 'self' data: https://*.stripe.com;
-    font-src 'self' https://fonts.gstatic.com;
-    connect-src 'self' https://api.stripe.com;
-    frame-src 'self' https://js.stripe.com https://hooks.stripe.com;
-    object-src 'none';
-    base-uri 'self';
-    form-action 'self';
-    frame-ancestors 'none';
-    block-all-mixed-content;
-    upgrade-insecure-requests;
-  `.replace(/\s+/g, ' ').trim();
+    // Remove calls outside the time window
+    while (calls.length > 0 && calls[0] < now - timeWindow) {
+      calls.shift();
+    }
+    
+    // Check if we're over the rate limit
+    if (calls.length >= maxCalls) {
+      console.warn('Rate limit exceeded');
+      return undefined;
+    }
+    
+    // Add this call to the log
+    calls.push(now);
+    
+    // Execute the function
+    return fn(...args);
+  };
 }

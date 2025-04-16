@@ -1,11 +1,13 @@
-import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertTriangle } from 'lucide-react';
+import React, { Component, ReactNode, ErrorInfo } from 'react';
+import { AlertCircle, RefreshCw, RotateCcw } from 'lucide-react';
+import { globalErrorHandler } from '@/lib/defensive';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
+  onReset?: () => void;
 }
 
 interface State {
@@ -14,28 +16,42 @@ interface State {
   errorInfo: ErrorInfo | null;
 }
 
+/**
+ * Error Boundary component to catch JavaScript errors anywhere in the child
+ * component tree and display a fallback UI instead of crashing the whole app
+ */
 class ErrorBoundary extends Component<Props, State> {
-  public state: State = {
-    hasError: false,
-    error: null,
-    errorInfo: null
-  };
-
-  public static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error, errorInfo: null };
+  constructor(props: Props) {
+    super(props);
+    this.state = {
+      hasError: false,
+      error: null,
+      errorInfo: null
+    };
   }
 
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+  static getDerivedStateFromError(error: Error): State {
+    // Update state so the next render will show the fallback UI
+    return {
+      hasError: true,
+      error,
+      errorInfo: null
+    };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    // You can log the error to an error reporting service here
+    console.error('ErrorBoundary caught an error', error, errorInfo);
     this.setState({ errorInfo });
     
-    // Log error to an error reporting service
-    console.error('Uncaught error:', error, errorInfo);
-    
-    // Here you would typically send to a logging service
-    // logErrorToService(error, errorInfo);
+    // Call global error handler to report error to monitoring service
+    globalErrorHandler(error, errorInfo);
   }
 
-  private handleReset = (): void => {
+  resetErrorBoundary = (): void => {
+    if (this.props.onReset) {
+      this.props.onReset();
+    }
     this.setState({
       hasError: false,
       error: null,
@@ -43,48 +59,78 @@ class ErrorBoundary extends Component<Props, State> {
     });
   };
 
-  public render(): ReactNode {
-    if (this.state.hasError) {
-      if (this.props.fallback) {
-        return this.props.fallback;
-      }
-      
-      return (
-        <div className="flex items-center justify-center min-h-[400px] p-4">
-          <Card className="w-full max-w-md border-destructive/20">
-            <CardHeader className="pb-3">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-destructive" />
-                <CardTitle className="text-destructive">Something went wrong</CardTitle>
-              </div>
-              <CardDescription>
-                An error occurred in this part of the application.
-              </CardDescription>
-            </CardHeader>
-            
-            <CardContent className="pb-3">
-              <div className="text-sm text-muted-foreground mb-3">
-                <p className="font-medium text-foreground">Error details:</p>
-                <div className="mt-1 p-2 bg-muted/50 rounded-md overflow-auto max-h-[200px]">
-                  <p className="font-mono text-xs">{this.state.error?.toString()}</p>
+  refreshPage = (): void => {
+    window.location.reload();
+  };
+
+  renderDefaultFallback = (): ReactNode => {
+    const { error, errorInfo } = this.state;
+    
+    return (
+      <Card className="p-6 max-w-3xl mx-auto my-8 bg-background border-destructive">
+        <div className="flex items-start space-x-4">
+          <div className="flex-shrink-0">
+            <AlertCircle className="h-10 w-10 text-destructive" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-xl font-semibold text-destructive mb-2">
+              Something went wrong
+            </h2>
+            <div className="text-muted-foreground mb-4">
+              <p>
+                We encountered an error while rendering this page. Please try again or contact support if the problem persists.
+              </p>
+              
+              {/* Show error details in development only */}
+              {process.env.NODE_ENV !== "production" && error && (
+                <div className="mt-4 p-4 bg-muted rounded text-sm font-mono overflow-auto">
+                  <p className="font-medium">Error details:</p>
+                  <p className="mt-1">{error.toString()}</p>
+                  {errorInfo && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer">Component Stack</summary>
+                      <pre className="mt-2 text-xs overflow-auto">
+                        {errorInfo.componentStack}
+                      </pre>
+                    </details>
+                  )}
                 </div>
-              </div>
-            </CardContent>
-            
-            <CardFooter>
-              <Button onClick={this.handleReset} variant="outline" className="mr-2">
+              )}
+            </div>
+            <div className="flex space-x-3">
+              <Button 
+                onClick={this.resetErrorBoundary}
+                variant="outline"
+                className="flex items-center space-x-1"
+              >
+                <RotateCcw className="h-4 w-4 mr-1" />
                 Try Again
               </Button>
-              <Button onClick={() => window.location.reload()}>
+              <Button
+                onClick={this.refreshPage}
+                variant="default"
+                className="flex items-center space-x-1"
+              >
+                <RefreshCw className="h-4 w-4 mr-1" />
                 Refresh Page
               </Button>
-            </CardFooter>
-          </Card>
+            </div>
+          </div>
         </div>
-      );
+      </Card>
+    );
+  };
+
+  render(): ReactNode {
+    const { children, fallback } = this.props;
+    const { hasError } = this.state;
+
+    if (hasError) {
+      // You can render any custom fallback UI
+      return fallback || this.renderDefaultFallback();
     }
 
-    return this.props.children;
+    return children;
   }
 }
 
