@@ -1,4 +1,5 @@
 import { pgTable, text, serial, integer, boolean, timestamp, json, decimal } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -34,9 +35,14 @@ export const products = pgTable("products", {
   category: text("category"),
   imageUrl: text("image_url"),
   inventory: integer("inventory"),
+  inventoryThreshold: integer("inventory_threshold").default(5),  // Alert when inventory falls below this
+  inventoryTracking: boolean("inventory_tracking").default(true), // Enable/disable automatic tracking
+  supplierProductId: text("supplier_product_id"),                 // External ID from supplier
+  supplierId: integer("supplier_id"),                             // Reference to supplier
   trending: boolean("trending").default(false),
   rating: decimal("rating"),
   reviewCount: integer("review_count"),
+  lastStockUpdate: timestamp("last_stock_update"),                // Last time stock was updated
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -94,6 +100,19 @@ export const payments = pgTable("payments", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+export const inventoryHistory = pgTable("inventory_history", {
+  id: serial("id").primaryKey(),
+  productId: integer("product_id").notNull(),
+  previousStock: integer("previous_stock"),
+  newStock: integer("new_stock").notNull(),
+  changeReason: text("change_reason"),  // e.g., "order", "manual adjustment", "supplier sync"
+  orderId: integer("order_id"),         // If change was due to an order
+  syncId: text("sync_id"),              // Batch ID for supplier sync operations
+  userId: integer("user_id"),           // User who made the change (if manual)
+  timestamp: timestamp("timestamp").defaultNow(),
+  metadata: json("metadata"),           // Any additional data
+});
+
 export const insertUserSchema = createInsertSchema(users).pick({
   username: true,
   password: true,
@@ -114,9 +133,14 @@ export const insertProductSchema = createInsertSchema(products).pick({
   category: true,
   imageUrl: true,
   inventory: true,
+  inventoryThreshold: true,
+  inventoryTracking: true,
+  supplierProductId: true,
+  supplierId: true,
   trending: true,
   rating: true,
   reviewCount: true,
+  lastStockUpdate: true,
 });
 
 export const insertSupplierSchema = createInsertSchema(suppliers).pick({
@@ -165,6 +189,17 @@ export const insertPaymentSchema = createInsertSchema(payments).pick({
   metadata: true,
 });
 
+export const insertInventoryHistorySchema = createInsertSchema(inventoryHistory).pick({
+  productId: true,
+  previousStock: true,
+  newStock: true,
+  changeReason: true,
+  orderId: true,
+  syncId: true,
+  userId: true,
+  metadata: true,
+});
+
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
@@ -182,3 +217,34 @@ export type Campaign = typeof campaigns.$inferSelect;
 
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 export type Payment = typeof payments.$inferSelect;
+
+export type InsertInventoryHistory = z.infer<typeof insertInventoryHistorySchema>;
+export type InventoryHistory = typeof inventoryHistory.$inferSelect;
+
+// Define relations between tables
+export const productRelations = relations(products, ({ one, many }) => ({
+  supplier: one(suppliers, {
+    fields: [products.supplierId],
+    references: [suppliers.id],
+  }),
+  inventoryHistory: many(inventoryHistory),
+}));
+
+export const supplierRelations = relations(suppliers, ({ many }) => ({
+  products: many(products),
+}));
+
+export const inventoryHistoryRelations = relations(inventoryHistory, ({ one }) => ({
+  product: one(products, {
+    fields: [inventoryHistory.productId],
+    references: [products.id],
+  }),
+  order: one(orders, {
+    fields: [inventoryHistory.orderId],
+    references: [orders.id],
+  }),
+  user: one(users, {
+    fields: [inventoryHistory.userId],
+    references: [users.id],
+  }),
+}));
