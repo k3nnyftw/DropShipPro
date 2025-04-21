@@ -28,6 +28,11 @@ const ProductDescriptionGeneratorPage = lazyImportDefault(() => import("@/pages/
 const EmailMarketingPage = lazyImportDefault(() => import("@/pages/email-marketing"));
 const SocialSharingPage = lazyImportDefault(() => import("@/pages/social-sharing"));
 
+// Subscription related pages
+const SubscriptionPage = lazyImportDefault(() => import("@/pages/subscription"));
+const SubscriptionSuccessPage = lazyImportDefault(() => import("@/pages/subscription/success"));
+const SubscriptionManagementPage = lazyImportDefault(() => import("@/pages/settings/subscription"));
+
 // Examples and demos
 const MobileOptimizationDemo = lazyImportDefault(() => import("@/components/examples/mobile-optimization-demo"));
 
@@ -112,6 +117,12 @@ function AppContent() {
                   <Route path="/email-marketing" component={EmailMarketingPage} />
                   <Route path="/social-sharing" component={SocialSharingPage} />
                   <Route path="/mobile-optimization-demo" component={MobileOptimizationDemo} />
+                  
+                  {/* Subscription Routes */}
+                  <Route path="/subscription" component={SubscriptionPage} />
+                  <Route path="/subscription/success" component={SubscriptionSuccessPage} />
+                  <Route path="/settings/subscription" component={SubscriptionManagementPage} />
+                  
                   <Route component={NotFound} />
                 </Switch>
               </Suspense>

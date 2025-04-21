@@ -7,7 +7,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle } from "lucide-react";
-import { SubscriptionPlan } from "../../shared/subscription";
+// Import SubscriptionPlan enum
+enum SubscriptionPlan {
+  FREE = 'free',
+  PRO = 'pro',
+  ENTERPRISE = 'enterprise'
+}
 import SubscriptionCheckout from "@/components/subscription/subscription-checkout";
 
 // Load Stripe outside of component to avoid recreating Stripe object on renders
