@@ -10,7 +10,7 @@ import { generateOrderNumber } from "@/lib/utils";
 
 // modify the interface with any CRUD methods
 // you might need
-import { Subscription, InsertSubscription, SubscriptionPlan } from '../shared/subscription';
+import { Subscription, InsertSubscription, SubscriptionPlan, SubscriptionStatus } from '../shared/subscription';
 
 export interface IStorage {
   // User methods
@@ -18,6 +18,8 @@ export interface IStorage {
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserPlan(userId: number, plan: SubscriptionPlan): Promise<User | undefined>;
+  updateStripeCustomerId(userId: number, stripeCustomerId: string): Promise<User | undefined>;
+  updateUserStripeInfo(userId: number, data: { stripeCustomerId: string, stripeSubscriptionId: string }): Promise<User | undefined>;
   
   // Subscription methods
   getUserSubscription(userId: number): Promise<Subscription | undefined>;
@@ -278,6 +280,8 @@ export class MemStorage implements IStorage {
       createdAt,
       plan: insertUser.plan || SubscriptionPlan.FREE,
       fullName: insertUser.fullName || null,
+      stripeCustomerId: insertUser.stripeCustomerId || null,
+      stripeSubscriptionId: insertUser.stripeSubscriptionId || null,
       trialEndsAt: insertUser.trialEndsAt || null
     };
     this.users.set(id, user);
@@ -291,6 +295,35 @@ export class MemStorage implements IStorage {
     }
     
     const updatedUser = { ...user, plan };
+    this.users.set(userId, updatedUser);
+    return updatedUser;
+  }
+  
+  async updateStripeCustomerId(userId: number, stripeCustomerId: string): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) {
+      return undefined;
+    }
+    
+    const updatedUser = { ...user, stripeCustomerId };
+    this.users.set(userId, updatedUser);
+    return updatedUser;
+  }
+  
+  async updateUserStripeInfo(userId: number, data: { 
+    stripeCustomerId: string, 
+    stripeSubscriptionId: string 
+  }): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) {
+      return undefined;
+    }
+    
+    const updatedUser = { 
+      ...user, 
+      stripeCustomerId: data.stripeCustomerId,
+      stripeSubscriptionId: data.stripeSubscriptionId
+    };
     this.users.set(userId, updatedUser);
     return updatedUser;
   }

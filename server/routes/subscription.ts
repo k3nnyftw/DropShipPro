@@ -8,7 +8,7 @@ export const router = Router();
 
 // Initialize Stripe
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2023-10-16",
+  apiVersion: "2025-03-31.basil",
 });
 
 /**
@@ -102,17 +102,9 @@ router.post("/create-checkout-session", async (req: Request, res: Response) => {
       payment_method_types: ["card"],
       line_items: [
         {
-          price_data: {
-            currency: "usd",
-            product_data: {
-              name: `Dropshipping Platform - ${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan`,
-              description: `Subscription to ${plan} plan with advanced features`,
-            },
-            unit_amount: unitAmount,
-            recurring: {
-              interval: "month",
-            },
-          },
+          price: plan === SubscriptionPlan.PRO 
+            ? process.env.STRIPE_PRICE_ID  // Use the price ID for PRO plan
+            : process.env.STRIPE_ENTERPRISE_PRICE_ID || process.env.STRIPE_PRICE_ID,  // Use enterprise price or fallback to PRO
           quantity: 1,
         },
       ],
