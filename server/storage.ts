@@ -77,6 +77,7 @@ export class MemStorage implements IStorage {
   private campaigns: Map<number, Campaign>;
   private payments: Map<number, Payment>;
   private subscriptions: Map<number, Subscription>;
+  private inventoryHistory: Map<number, InventoryHistory>;
   currentId: number;
 
   constructor() {
@@ -87,6 +88,7 @@ export class MemStorage implements IStorage {
     this.campaigns = new Map();
     this.payments = new Map();
     this.subscriptions = new Map();
+    this.inventoryHistory = new Map();
     this.currentId = 1;
     this.initDemoData();
   }
@@ -668,6 +670,84 @@ export class MemStorage implements IStorage {
     };
     this.payments.set(id, payment);
     return payment;
+  }
+
+  // Inventory tracking methods
+  async getInventoryHistoryByProductId(productId: number, limit = 20): Promise<InventoryHistory[]> {
+    const allHistory = Array.from(this.inventoryHistory.values())
+      .filter(history => history.productId === productId)
+      .sort((a, b) => 
+        // Sort by timestamp, most recent first
+        new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+      );
+    
+    return allHistory.slice(0, limit);
+  }
+
+  async createInventoryHistory(insertHistory: InsertInventoryHistory): Promise<InventoryHistory> {
+    const id = this.currentId++;
+    const timestamp = new Date();
+    
+    const history: InventoryHistory = { 
+      ...insertHistory, 
+      id, 
+      timestamp,
+      // Set defaults for optional fields
+      previousStock: insertHistory.previousStock || 0,
+      orderId: insertHistory.orderId || null,
+      syncId: insertHistory.syncId || null,
+      userId: insertHistory.userId || null,
+      metadata: insertHistory.metadata || null
+    };
+    
+    this.inventoryHistory.set(id, history);
+    return history;
+  }
+
+  async updateProductInventory(productId: number, newStock: number, updateTimestamp: Date): Promise<Product | undefined> {
+    const product = this.products.get(productId);
+    if (!product) {
+      return undefined;
+    }
+
+    const updatedProduct = { 
+      ...product, 
+      inventory: newStock,
+      lastStockUpdate: updateTimestamp
+    };
+    
+    this.products.set(productId, updatedProduct);
+    return updatedProduct;
+  }
+
+  async updateProductInventoryTracking(productId: number, enabled: boolean): Promise<Product | undefined> {
+    const product = this.products.get(productId);
+    if (!product) {
+      return undefined;
+    }
+
+    const updatedProduct = { 
+      ...product, 
+      inventoryTracking: enabled
+    };
+    
+    this.products.set(productId, updatedProduct);
+    return updatedProduct;
+  }
+
+  async updateProductInventoryThreshold(productId: number, threshold: number): Promise<Product | undefined> {
+    const product = this.products.get(productId);
+    if (!product) {
+      return undefined;
+    }
+
+    const updatedProduct = { 
+      ...product, 
+      inventoryThreshold: threshold
+    };
+    
+    this.products.set(productId, updatedProduct);
+    return updatedProduct;
   }
 }
 

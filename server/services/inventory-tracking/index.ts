@@ -6,7 +6,7 @@ import {
   products,
   inventoryHistory
 } from "@shared/schema";
-import { storage } from "@/storage";
+import { storage } from "../../storage";
 import { eq, lt } from "drizzle-orm";
 
 /**
