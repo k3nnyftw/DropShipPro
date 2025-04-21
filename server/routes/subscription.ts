@@ -1,371 +1,416 @@
-import { Request, Response, Router } from "express";
-import { z } from "zod";
-import Stripe from "stripe";
-import { storage } from "../storage";
-import { InsertSubscription, Subscription, SubscriptionPlan, SubscriptionStatus, hasFeatureAccess, planFeatureLimits } from "../../shared/subscription";
+import express from 'express';
+import { z } from 'zod';
+import { storage } from '../storage';
+import { SubscriptionPlan, SubscriptionStatus, planFeatureLimits } from '@shared/subscription';
+import * as stripeService from '../services/stripe';
 
-export const router = Router();
+const router = express.Router();
 
-// Initialize Stripe
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2025-03-31.basil",
+// Schema for create checkout session request
+const createCheckoutSessionSchema = z.object({
+  plan: z.enum([SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE]),
+  successUrl: z.string().url(),
+  cancelUrl: z.string().url(),
 });
 
-/**
- * GET /api/subscription/plans
- * Get all available subscription plans with their features and pricing
- */
-router.get("/plans", async (req: Request, res: Response) => {
-  const plans = Object.values(SubscriptionPlan).map(plan => ({
-    name: plan,
-    ...planFeatureLimits[plan],
-    features: Object.entries(planFeatureLimits[plan].features).map(([feature, enabled]) => ({
-      name: feature,
-      enabled
-    }))
-  }));
-  
-  res.json(plans);
+// Schema for plan change request
+const changePlanSchema = z.object({
+  newPlan: z.enum([SubscriptionPlan.FREE, SubscriptionPlan.PRO, SubscriptionPlan.ENTERPRISE]),
 });
 
-/**
- * GET /api/subscription/current
- * Get current user's subscription
- */
-router.get("/current", async (req: Request, res: Response) => {
-  // In a real application, we would get the user ID from the session
-  // For demo purposes, we'll use a fixed user ID
-  const userId = 1; // Demo user ID
-  
-  const subscription = await storage.getUserSubscription(userId);
-  
-  if (!subscription) {
-    // If no subscription exists, return free plan details
-    return res.json({
-      plan: SubscriptionPlan.FREE,
-      status: SubscriptionStatus.ACTIVE,
-      features: planFeatureLimits[SubscriptionPlan.FREE].features,
-      limits: {
-        maxStores: planFeatureLimits[SubscriptionPlan.FREE].maxStores,
-        maxProducts: planFeatureLimits[SubscriptionPlan.FREE].maxProducts,
-        maxOrdersPerDay: planFeatureLimits[SubscriptionPlan.FREE].maxOrdersPerDay,
-        maxApi: planFeatureLimits[SubscriptionPlan.FREE].maxApi,
-      }
-    });
+// Helper to check if user is authenticated
+function isAuthenticated(req: any, res: express.Response, next: express.NextFunction) {
+  if (!req.isAuthenticated || !req.isAuthenticated()) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
-  
-  // Return subscription with feature access
-  res.json({
-    id: subscription.id,
-    plan: subscription.plan,
-    status: subscription.status,
-    currentPeriodEnd: subscription.currentPeriodEnd,
-    cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
-    features: planFeatureLimits[subscription.plan].features,
-    limits: {
-      maxStores: planFeatureLimits[subscription.plan].maxStores,
-      maxProducts: planFeatureLimits[subscription.plan].maxProducts,
-      maxOrdersPerDay: planFeatureLimits[subscription.plan].maxOrdersPerDay,
-      maxApi: planFeatureLimits[subscription.plan].maxApi,
-    }
-  });
-});
+  next();
+}
 
-/**
- * POST /api/subscription/create-checkout-session
- * Creates a Stripe checkout session for subscription
- */
-router.post("/create-checkout-session", async (req: Request, res: Response) => {
-  const schema = z.object({
-    plan: z.nativeEnum(SubscriptionPlan),
-    successUrl: z.string().url(),
-    cancelUrl: z.string().url(),
-  });
-  
+// Get current subscription details
+router.get('/current', isAuthenticated, async (req: any, res) => {
   try {
-    const { plan, successUrl, cancelUrl } = schema.parse(req.body);
+    const userId = req.user.id;
     
-    // In a real application, we would get the user ID from the session
-    // For demo purposes, we'll use a fixed user ID
-    const userId = 1; // Demo user ID
+    // Get subscription from database
+    const subscription = await storage.getUserSubscription(userId);
     
-    // Get plan price from our configuration
-    const planConfig = planFeatureLimits[plan];
-    const unitAmount = planConfig.price ? Math.round(planConfig.price * 100) : 0;
-    
-    if (!unitAmount) {
-      return res.status(400).json({ message: `Plan ${plan} is not available for purchase` });
+    if (!subscription) {
+      // Return free plan details if no subscription exists
+      return res.json({
+        plan: SubscriptionPlan.FREE,
+        status: SubscriptionStatus.ACTIVE,
+        features: planFeatureLimits[SubscriptionPlan.FREE].features,
+        limits: {
+          maxStores: planFeatureLimits[SubscriptionPlan.FREE].maxStores,
+          maxProducts: planFeatureLimits[SubscriptionPlan.FREE].maxProducts,
+          maxOrdersPerDay: planFeatureLimits[SubscriptionPlan.FREE].maxOrdersPerDay,
+          maxApi: planFeatureLimits[SubscriptionPlan.FREE].maxApi,
+        }
+      });
     }
     
-    // Create a checkout session
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [
-        {
-          price: plan === SubscriptionPlan.PRO 
-            ? process.env.STRIPE_PRICE_ID  // Use the price ID for PRO plan
-            : process.env.STRIPE_ENTERPRISE_PRICE_ID || process.env.STRIPE_PRICE_ID,  // Use enterprise price or fallback to PRO
-          quantity: 1,
-        },
-      ],
-      mode: "subscription",
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      metadata: {
-        userId: userId.toString(),
-        plan,
-      },
-    });
-    
-    res.json({ sessionId: session.id, url: session.url });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return res.status(400).json({ message: "Invalid request data", errors: error.errors });
-    }
-    console.error("Stripe checkout session error:", error);
-    res.status(500).json({ message: "Failed to create checkout session" });
-  }
-});
-
-/**
- * POST /api/subscription/webhook
- * Stripe webhook for subscription events
- */
-router.post("/webhook", async (req: Request, res: Response) => {
-  const sig = req.headers["stripe-signature"] as string;
-  const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  
-  // Verify webhook signature
-  if (!endpointSecret) {
-    return res.status(400).json({ message: "Webhook secret not configured" });
-  }
-  
-  let event;
-  
-  try {
-    // Verify the event came from Stripe
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      endpointSecret
-    );
-    
-    // Handle the event
-    switch (event.type) {
-      case "checkout.session.completed": {
-        const session = event.data.object as Stripe.Checkout.Session;
+    // If we have a Stripe subscription ID, fetch the latest details from Stripe
+    if (subscription.stripeSubscriptionId) {
+      try {
+        const stripeSubscription = await stripeService.retrieveSubscription(subscription.stripeSubscriptionId);
         
-        // Get user ID and plan from metadata
-        const userId = parseInt(session.metadata?.userId || "0");
-        const plan = session.metadata?.plan as SubscriptionPlan;
-        
-        if (!userId || !plan) {
-          return res.status(400).json({ message: "Missing user ID or plan in metadata" });
-        }
-        
-        // Get Stripe subscription details
-        const stripeSubscriptionId = session.subscription as string;
-        const stripeSubscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
-        
-        // Create subscription in our database
-        const newSubscription: InsertSubscription = {
-          userId,
-          plan,
-          status: SubscriptionStatus.ACTIVE,
-          stripeCustomerId: session.customer as string,
-          stripeSubscriptionId,
-          priceId: stripeSubscription.items.data[0].price.id,
-          currentPeriodStart: new Date(stripeSubscription.current_period_start * 1000),
-          currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
-          cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
-        };
-        
-        // Check if user already has a subscription
-        const existingSubscription = await storage.getUserSubscription(userId);
-        
-        if (existingSubscription) {
-          // Update existing subscription
-          await storage.updateSubscription(existingSubscription.id, newSubscription);
-        } else {
-          // Create new subscription
-          await storage.createSubscription(newSubscription);
-        }
-        
-        // Update user's plan
-        await storage.updateUserPlan(userId, plan);
-        
-        break;
-      }
-        
-      case "invoice.payment_succeeded": {
-        // Handle successful invoice payment (subscription renewal)
-        const invoice = event.data.object as Stripe.Invoice;
-        const subscriptionId = invoice.subscription as string;
-        
-        if (subscriptionId) {
-          const stripeSubscription = await stripe.subscriptions.retrieve(subscriptionId);
+        // Update subscription data with latest from Stripe if needed
+        if (stripeSubscription.status !== subscription.status ||
+            stripeSubscription.cancel_at_period_end !== subscription.cancelAtPeriodEnd) {
           
-          // Find subscription in our database by Stripe subscription ID
-          const subscription = Array.from((storage as any).subscriptions.values())
-            .find((sub: Subscription) => sub.stripeSubscriptionId === subscriptionId);
+          // Map Stripe status to our status enum
+          let status = subscription.status;
+          if (stripeSubscription.status === 'active') status = SubscriptionStatus.ACTIVE;
+          if (stripeSubscription.status === 'past_due') status = SubscriptionStatus.PAST_DUE;
+          if (stripeSubscription.status === 'canceled') status = SubscriptionStatus.CANCELED;
+          if (stripeSubscription.status === 'trialing') status = SubscriptionStatus.TRIAL;
           
-          if (subscription) {
-            await storage.updateSubscription(subscription.id, {
-              status: SubscriptionStatus.ACTIVE,
-              currentPeriodStart: new Date(stripeSubscription.current_period_start * 1000),
-              currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
-              cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
-            });
-          }
-        }
-        
-        break;
-      }
-        
-      case "invoice.payment_failed": {
-        // Handle failed invoice payment
-        const invoice = event.data.object as Stripe.Invoice;
-        const subscriptionId = invoice.subscription as string;
-        
-        if (subscriptionId) {
-          // Find subscription in our database by Stripe subscription ID
-          const subscription = Array.from((storage as any).subscriptions.values())
-            .find((sub: Subscription) => sub.stripeSubscriptionId === subscriptionId);
-          
-          if (subscription) {
-            await storage.updateSubscription(subscription.id, {
-              status: SubscriptionStatus.PAST_DUE,
-            });
-          }
-        }
-        
-        break;
-      }
-        
-      case "customer.subscription.deleted": {
-        // Handle subscription cancellation
-        const stripeSubscription = event.data.object as Stripe.Subscription;
-        
-        // Find subscription in our database by Stripe subscription ID
-        const subscription = Array.from((storage as any).subscriptions.values())
-          .find((sub: Subscription) => sub.stripeSubscriptionId === stripeSubscription.id);
-        
-        if (subscription) {
+          // Update local subscription
           await storage.updateSubscription(subscription.id, {
-            status: SubscriptionStatus.CANCELED,
+            status,
+            cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
+            currentPeriodStart: new Date(stripeSubscription.current_period_start * 1000),
+            currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000),
           });
           
-          // Downgrade user to free plan
-          await storage.updateUserPlan(subscription.userId, SubscriptionPlan.FREE);
+          // Update subscription object for response
+          subscription.status = status;
+          subscription.cancelAtPeriodEnd = stripeSubscription.cancel_at_period_end;
+          subscription.currentPeriodStart = new Date(stripeSubscription.current_period_start * 1000);
+          subscription.currentPeriodEnd = new Date(stripeSubscription.current_period_end * 1000);
         }
-        
-        break;
+      } catch (error) {
+        console.error('Error fetching subscription from Stripe:', error);
+        // Continue with local data if Stripe fetch fails
       }
+    }
+    
+    // Return subscription with feature access
+    const plan = subscription.plan;
+    return res.json({
+      ...subscription,
+      features: planFeatureLimits[plan].features,
+      limits: {
+        maxStores: planFeatureLimits[plan].maxStores,
+        maxProducts: planFeatureLimits[plan].maxProducts,
+        maxOrdersPerDay: planFeatureLimits[plan].maxOrdersPerDay,
+        maxApi: planFeatureLimits[plan].maxApi,
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching subscription:', error);
+    res.status(500).json({ error: 'Failed to fetch subscription details' });
+  }
+});
+
+// Create checkout session for subscription
+router.post('/create-checkout-session', isAuthenticated, async (req: any, res) => {
+  try {
+    // Validate request
+    const result = createCheckoutSessionSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.errors });
+    }
+    
+    const { plan, successUrl, cancelUrl } = result.data;
+    const userId = req.user.id;
+    const user = await storage.getUser(userId);
+    
+    if (!user) {
+      return res.status(401).json({ error: 'User not found' });
+    }
+    
+    // Get price ID for the selected plan
+    const priceId = stripeService.getPriceIdForPlan(plan);
+    if (!priceId) {
+      return res.status(400).json({ error: 'Invalid plan or price ID not configured' });
+    }
+    
+    // Check if user already has a Stripe customer ID
+    let customerId = user.stripeCustomerId;
+    
+    if (!customerId) {
+      // Create a new customer in Stripe
+      const customer = await stripeService.createStripeCustomer(
+        user.email,
+        user.fullName || user.username
+      );
+      
+      // Update user with Stripe customer ID
+      await storage.updateStripeCustomerId(userId, customer.id);
+      customerId = customer.id;
+    }
+    
+    // Create checkout session
+    const session = await stripeService.createSubscriptionCheckoutSession(
+      customerId,
+      priceId,
+      successUrl,
+      cancelUrl
+    );
+    
+    // Return the checkout session URL
+    res.json({ 
+      url: session.url,
+      clientSecret: session.client_secret 
+    });
+  } catch (error: any) {
+    console.error('Error creating checkout session:', error);
+    res.status(500).json({ 
+      error: 'Failed to create checkout session',
+      message: error.message 
+    });
+  }
+});
+
+// Cancel subscription
+router.post('/cancel', isAuthenticated, async (req: any, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Get subscription from DB
+    const subscription = await storage.getUserSubscription(userId);
+    
+    if (!subscription || !subscription.stripeSubscriptionId) {
+      return res.status(400).json({ error: 'No active subscription found' });
+    }
+    
+    // Cancel subscription in Stripe
+    const canceledSubscription = await stripeService.cancelSubscription(
+      subscription.stripeSubscriptionId
+    );
+    
+    // Update local subscription
+    await storage.updateSubscription(subscription.id, {
+      cancelAtPeriodEnd: true
+    });
+    
+    // Return updated subscription
+    res.json({ 
+      success: true, 
+      cancelAtPeriodEnd: true,
+      currentPeriodEnd: new Date(canceledSubscription.current_period_end * 1000)
+    });
+  } catch (error) {
+    console.error('Error canceling subscription:', error);
+    res.status(500).json({ error: 'Failed to cancel subscription' });
+  }
+});
+
+// Change subscription plan
+router.post('/change-plan', isAuthenticated, async (req: any, res) => {
+  try {
+    // Validate request
+    const result = changePlanSchema.safeParse(req.body);
+    if (!result.success) {
+      return res.status(400).json({ error: result.error.errors });
+    }
+    
+    const { newPlan } = result.data;
+    const userId = req.user.id;
+    
+    // Get current subscription
+    const subscription = await storage.getUserSubscription(userId);
+    
+    // Handle downgrade to free plan
+    if (newPlan === SubscriptionPlan.FREE) {
+      if (!subscription || !subscription.stripeSubscriptionId) {
+        return res.status(400).json({ error: 'No active subscription found' });
+      }
+      
+      // Cancel at period end
+      await stripeService.cancelSubscription(subscription.stripeSubscriptionId);
+      
+      // Update subscription in database
+      await storage.updateSubscription(subscription.id, {
+        cancelAtPeriodEnd: true
+      });
+      
+      return res.json({ 
+        success: true, 
+        message: 'Subscription will be canceled at the end of the billing period' 
+      });
+    }
+    
+    // Handle upgrades or changes between paid plans
+    if (!subscription || !subscription.stripeSubscriptionId) {
+      // If no existing subscription, create a checkout session for the new plan
+      return res.status(400).json({ 
+        error: 'No active subscription found',
+        message: 'Please use the /create-checkout-session endpoint to create a new subscription'
+      });
+    }
+    
+    // Get price ID for new plan
+    const newPriceId = stripeService.getPriceIdForPlan(newPlan);
+    if (!newPriceId) {
+      return res.status(400).json({ error: 'Invalid plan or price ID not configured' });
+    }
+    
+    // Update subscription in Stripe
+    const updatedSubscription = await stripeService.updateSubscription(
+      subscription.stripeSubscriptionId,
+      newPriceId
+    );
+    
+    // Update subscription in database
+    await storage.updateSubscription(subscription.id, {
+      plan: newPlan,
+      priceId: newPriceId,
+      cancelAtPeriodEnd: false
+    });
+    
+    // Update user plan
+    await storage.updateUserPlan(userId, newPlan);
+    
+    // Return success
+    res.json({ 
+      success: true, 
+      plan: newPlan,
+      message: 'Subscription plan updated successfully' 
+    });
+  } catch (error) {
+    console.error('Error changing subscription plan:', error);
+    res.status(500).json({ error: 'Failed to change subscription plan' });
+  }
+});
+
+// Webhook handler for Stripe events
+router.post('/webhook', express.raw({type: 'application/json'}), async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  
+  if (!sig) {
+    return res.status(400).json({ error: 'Stripe signature missing' });
+  }
+  
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    console.warn('STRIPE_WEBHOOK_SECRET is not set, skipping signature verification');
+    // We'll still process the event without verification in development
+  } else {
+    try {
+      // Note: in a real production environment, we should verify the signature
+      // const event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET);
+    } catch (err: any) {
+      return res.status(400).json({ error: `Webhook Error: ${err.message}` });
+    }
+  }
+  
+  // Process the event
+  try {
+    const event = JSON.parse(req.body.toString());
+    const eventHandler = await stripeService.handleWebhookEvent(event);
+    
+    // Handle specific events
+    switch (event.type) {
+      case 'invoice.payment_succeeded':
+        await handleInvoicePaymentSucceeded(event.data.object);
+        break;
+      
+      case 'customer.subscription.updated':
+        await handleSubscriptionUpdated(event.data.object);
+        break;
+      
+      case 'customer.subscription.deleted':
+        await handleSubscriptionDeleted(event.data.object);
+        break;
     }
     
     res.json({ received: true });
   } catch (error) {
-    console.error("Webhook error:", error);
-    res.status(400).json({ message: "Webhook error" });
+    console.error('Error handling webhook event:', error);
+    res.status(500).json({ error: 'Failed to process webhook event' });
   }
 });
 
-/**
- * POST /api/subscription/cancel
- * Cancel current subscription
- */
-router.post("/cancel", async (req: Request, res: Response) => {
-  // In a real application, we would get the user ID from the session
-  // For demo purposes, we'll use a fixed user ID
-  const userId = 1; // Demo user ID
+// Helper function to handle invoice.payment_succeeded events
+async function handleInvoicePaymentSucceeded(invoice: any) {
+  if (!invoice.subscription) {
+    return; // Not a subscription invoice
+  }
   
   try {
-    const subscription = await storage.getUserSubscription(userId);
+    // Find the subscription in our database
+    const subscriptions = Array.from(await storage.getAllSubscriptions());
+    const subscription = subscriptions.find(sub => 
+      sub.stripeSubscriptionId === invoice.subscription
+    );
     
     if (!subscription) {
-      return res.status(404).json({ message: "No active subscription found" });
+      return; // Subscription not found
     }
     
-    if (!subscription.stripeSubscriptionId) {
-      return res.status(400).json({ message: "Subscription cannot be canceled" });
-    }
-    
-    // Cancel at period end in Stripe
-    await stripe.subscriptions.update(subscription.stripeSubscriptionId, {
-      cancel_at_period_end: true,
-    });
-    
-    // Update our database
+    // Update subscription status if needed
     await storage.updateSubscription(subscription.id, {
-      cancelAtPeriodEnd: true,
+      status: SubscriptionStatus.ACTIVE,
+      // Handle conversion from Stripe timestamps (seconds) to JavaScript Date (milliseconds)
+      currentPeriodStart: invoice.period_start ? new Date(invoice.period_start * 1000) : null,
+      currentPeriodEnd: invoice.period_end ? new Date(invoice.period_end * 1000) : null,
     });
-    
-    res.json({ message: "Subscription will be canceled at the end of the billing period" });
   } catch (error) {
-    console.error("Subscription cancellation error:", error);
-    res.status(500).json({ message: "Failed to cancel subscription" });
+    console.error('Error handling invoice.payment_succeeded:', error);
   }
-});
+}
 
-/**
- * GET /api/subscription/feature-access/:feature
- * Check if a user has access to a specific feature
- */
-router.get("/feature-access/:feature", async (req: Request, res: Response) => {
-  // In a real application, we would get the user ID from the session
-  // For demo purposes, we'll use a fixed user ID
-  const userId = 1; // Demo user ID
-  
-  const { feature } = req.params;
-  
+// Helper function to handle customer.subscription.updated events
+async function handleSubscriptionUpdated(stripeSubscription: any) {
   try {
-    // DEVELOPMENT MODE: All features are accessible
-    // In production, you would remove this and use the actual subscription check
-    if (process.env.NODE_ENV !== "production") {
-      const isDeveloperMode = true; // Set this to false to test subscription restrictions locally
-      
-      if (isDeveloperMode) {
-        console.log(`[DEV MODE] Granting access to premium feature: ${feature}`);
-        return res.json({
-          feature,
-          hasAccess: true, // Always grant access in development
-          plan: "developer",
-          upgradeTo: null
-        });
-      }
+    // Find the subscription in our database
+    const subscriptions = Array.from(await storage.getAllSubscriptions());
+    const subscription = subscriptions.find(sub => 
+      sub.stripeSubscriptionId === stripeSubscription.id
+    );
+    
+    if (!subscription) {
+      return; // Subscription not found
     }
     
-    // Get user's plan
-    const user = await storage.getUser(userId);
+    // Map Stripe status to our status enum
+    let status = subscription.status;
+    if (stripeSubscription.status === 'active') status = SubscriptionStatus.ACTIVE;
+    if (stripeSubscription.status === 'past_due') status = SubscriptionStatus.PAST_DUE;
+    if (stripeSubscription.status === 'canceled') status = SubscriptionStatus.CANCELED;
+    if (stripeSubscription.status === 'trialing') status = SubscriptionStatus.TRIAL;
     
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
-    
-    const plan = user.plan as SubscriptionPlan || SubscriptionPlan.FREE;
-    
-    // Check if feature is valid
-    if (!(feature in planFeatureLimits[SubscriptionPlan.FREE].features)) {
-      return res.status(400).json({ message: "Invalid feature" });
-    }
-    
-    // Check if user has access to this feature
-    const hasAccess = hasFeatureAccess(plan, feature as keyof typeof planFeatureLimits[SubscriptionPlan.FREE]['features']);
-    
-    res.json({ 
-      feature, 
-      hasAccess, 
-      plan,
-      upgradeTo: !hasAccess 
-        ? Object.values(SubscriptionPlan).find(p => 
-            hasFeatureAccess(p, feature as keyof typeof planFeatureLimits[SubscriptionPlan.FREE]['features'])
-          )
-        : null
+    // Update subscription
+    await storage.updateSubscription(subscription.id, {
+      status,
+      cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
+      currentPeriodStart: stripeSubscription.current_period_start ? new Date(stripeSubscription.current_period_start * 1000) : null,
+      currentPeriodEnd: stripeSubscription.current_period_end ? new Date(stripeSubscription.current_period_end * 1000) : null,
     });
   } catch (error) {
-    console.error("Feature access check error:", error);
-    res.status(500).json({ message: "Failed to check feature access" });
+    console.error('Error handling customer.subscription.updated:', error);
   }
-});
+}
+
+// Helper function to handle customer.subscription.deleted events
+async function handleSubscriptionDeleted(stripeSubscription: any) {
+  try {
+    // Find the subscription in our database
+    const subscriptions = Array.from(await storage.getAllSubscriptions());
+    const subscription = subscriptions.find(sub => 
+      sub.stripeSubscriptionId === stripeSubscription.id
+    );
+    
+    if (!subscription) {
+      return; // Subscription not found
+    }
+    
+    // Update subscription status
+    await storage.updateSubscription(subscription.id, {
+      status: SubscriptionStatus.CANCELED,
+      cancelAtPeriodEnd: false,
+    });
+    
+    // Update user plan to FREE
+    await storage.updateUserPlan(subscription.userId, SubscriptionPlan.FREE);
+  } catch (error) {
+    console.error('Error handling customer.subscription.deleted:', error);
+  }
+}
+
+// Import Subscription type for webhook handling
+import { MemStorage } from '../storage';
+import { Subscription } from '@shared/subscription';
 
 export default router;

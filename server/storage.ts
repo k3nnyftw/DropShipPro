@@ -25,6 +25,7 @@ export interface IStorage {
   getUserSubscription(userId: number): Promise<Subscription | undefined>;
   createSubscription(subscription: InsertSubscription): Promise<Subscription>;
   updateSubscription(id: number, updates: Partial<Subscription>): Promise<Subscription | undefined>;
+  getAllSubscriptions(): Promise<Subscription[]>;
   
   // Product methods
   getProduct(id: number): Promise<Product | undefined>;
@@ -80,6 +81,11 @@ export class MemStorage implements IStorage {
     this.subscriptions = new Map();
     this.currentId = 1;
     this.initDemoData();
+  }
+  
+  // Get all subscriptions
+  async getAllSubscriptions(): Promise<Subscription[]> {
+    return Array.from(this.subscriptions.values());
   }
 
   private initDemoData() {

@@ -1,12 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { storage } from '../storage';
-import { 
+import stripe, { 
   createPaymentIntent, 
-  createCheckoutSession, 
+  createPaymentCheckoutSession as createCheckoutSession, 
   retrievePaymentIntent, 
-  retrieveCheckoutSession,
-  constructWebhookEvent
+  retrieveCheckoutSession
 } from '../services/stripe';
 
 const router = Router();
@@ -175,7 +174,7 @@ router.post('/webhook', async (req, res) => {
     try {
       // For production, we verify the webhook signature
       if (webhookSecret && signature) {
-        event = await constructWebhookEvent(
+        event = stripe.webhooks.constructEvent(
           req.body,
           signature,
           webhookSecret
