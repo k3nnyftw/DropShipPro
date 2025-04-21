@@ -9,6 +9,7 @@ const TabNavigation: React.FC = () => {
     { name: "Store View", path: "/store" },
     { name: "Product Discovery", path: "/product-discovery" },
     { name: "Supplier Analysis", path: "/supplier-analysis" },
+    { name: "Inventory", path: "/inventory/tracking" },
     { name: "Advertising", path: "/advertising" },
     { name: "Orders", path: "/orders" },
     { name: "Automation", path: "/automation" }

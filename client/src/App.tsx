@@ -27,6 +27,7 @@ const CompetitorTrackingPage = lazyImportDefault(() => import("@/pages/competito
 const ProductDescriptionGeneratorPage = lazyImportDefault(() => import("@/pages/product-description-generator"));
 const EmailMarketingPage = lazyImportDefault(() => import("@/pages/email-marketing"));
 const SocialSharingPage = lazyImportDefault(() => import("@/pages/social-sharing"));
+const InventoryTrackingPage = lazyImportDefault(() => import("@/pages/inventory/tracking"));
 
 // Subscription related pages
 const SubscriptionPage = lazyImportDefault(() => import("@/pages/subscription"));
@@ -116,6 +117,7 @@ function AppContent() {
                   <Route path="/product-description-generator" component={ProductDescriptionGeneratorPage} />
                   <Route path="/email-marketing" component={EmailMarketingPage} />
                   <Route path="/social-sharing" component={SocialSharingPage} />
+                  <Route path="/inventory/tracking" component={InventoryTrackingPage} />
                   <Route path="/mobile-optimization-demo" component={MobileOptimizationDemo} />
                   
                   {/* Subscription Routes */}
