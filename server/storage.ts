@@ -4,7 +4,8 @@ import {
   suppliers, type Supplier, type InsertSupplier,
   orders, type Order, type InsertOrder,
   campaigns, type Campaign, type InsertCampaign,
-  payments, type Payment, type InsertPayment
+  payments, type Payment, type InsertPayment,
+  inventoryHistory, type InventoryHistory, type InsertInventoryHistory
 } from "@shared/schema";
 import { generateOrderNumber } from "@/lib/utils";
 
@@ -59,6 +60,13 @@ export interface IStorage {
   getPayment(id: number): Promise<Payment | undefined>;
   getPaymentsByOrderId(orderId: number): Promise<Payment[]>;
   createPayment(payment: InsertPayment): Promise<Payment>;
+  
+  // Inventory tracking methods
+  getInventoryHistoryByProductId(productId: number, limit?: number): Promise<InventoryHistory[]>;
+  createInventoryHistory(history: InsertInventoryHistory): Promise<InventoryHistory>;
+  updateProductInventory(productId: number, newStock: number, updateTimestamp: Date): Promise<Product | undefined>;
+  updateProductInventoryTracking(productId: number, enabled: boolean): Promise<Product | undefined>;
+  updateProductInventoryThreshold(productId: number, threshold: number): Promise<Product | undefined>;
 }
 
 export class MemStorage implements IStorage {
