@@ -8,6 +8,7 @@ import aiAnalyticsRoutes from "./routes/ai-analytics";
 import priceOptimizerRoutes from "./routes/price-optimizer";
 import orderFulfillmentRoutes from "./routes/order-fulfillment";
 import inventoryManagerRoutes from "./routes/inventory-manager";
+import inventoryTrackingRoutes from "./routes/inventory";
 import demandForecastingRoutes from "./routes/demand-forecasting";
 import competitorTrackingRoutes from "./routes/competitor-tracking";
 import productDescriptionRoutes from "./routes/product-description-generator";
@@ -23,6 +24,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/price-optimizer', priceOptimizerRoutes);
   app.use('/api/fulfillment', orderFulfillmentRoutes);
   app.use('/api/inventory', inventoryManagerRoutes);
+  app.use('/api/inventory-tracking', inventoryTrackingRoutes);
   app.use('/api/forecasting', demandForecastingRoutes);
   app.use('/api/competitors', competitorTrackingRoutes);
   app.use('/api/descriptions', productDescriptionRoutes);
