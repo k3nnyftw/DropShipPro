@@ -1,9 +1,9 @@
-import { useStripe, useElements, PaymentElement } from "@stripe/react-stripe-js";
 import { useState } from "react";
+import { useElements, useStripe, PaymentElement } from "@stripe/react-stripe-js";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Loader2, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
 
 interface SubscriptionCheckoutProps {
   planName: string;
@@ -13,87 +13,123 @@ interface SubscriptionCheckoutProps {
 export default function SubscriptionCheckout({ planName, planPrice }: SubscriptionCheckoutProps) {
   const stripe = useStripe();
   const elements = useElements();
-  const [isLoading, setIsLoading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    
     if (!stripe || !elements) {
-      toast({
-        title: "Checkout Error",
-        description: "Stripe hasn't loaded yet. Please try again.",
-        variant: "destructive",
-      });
+      // Stripe.js hasn't loaded yet
       return;
     }
-
-    setIsLoading(true);
-
+    
+    setIsProcessing(true);
+    
     try {
-      const { error } = await stripe.confirmPayment({
+      // Confirm the payment
+      const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
         confirmParams: {
           return_url: `${window.location.origin}/subscription/success`,
         },
+        redirect: "if_required"
       });
 
       if (error) {
+        // Show error to your customer
         toast({
           title: "Payment Failed",
-          description: error.message || "Something went wrong with your payment.",
+          description: error.message || "An unexpected error occurred.",
           variant: "destructive",
         });
+        setIsProcessing(false);
+        return;
       }
-      // On successful payment, the user will be redirected to the return_url
-    } catch (err: any) {
+      
+      if (paymentIntent && paymentIntent.status === "succeeded") {
+        // Payment succeeded
+        setPaymentSuccess(true);
+        toast({
+          title: "Payment Successful!",
+          description: "Your subscription is now active.",
+        });
+        
+        // Redirect after a short delay to show success state
+        setTimeout(() => {
+          window.location.href = `${window.location.origin}/subscription/success`;
+        }, 2000);
+      } else {
+        // For other status types like requires_action, we'll let Stripe handle the redirect
+        setIsProcessing(false);
+      }
+    } catch (err) {
+      console.error("Payment error:", err);
       toast({
-        title: "Checkout Error",
-        description: err?.message || "An unexpected error occurred during checkout.",
+        title: "Payment Error",
+        description: "There was a problem processing your payment. Please try again.",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
+      setIsProcessing(false);
     }
   };
 
-  return (
-    <div className="max-w-md mx-auto">
-      <Card>
-        <CardHeader>
-          <CardTitle>Subscribe to {planName} Plan</CardTitle>
-          <CardDescription>Complete your subscription to unlock premium features</CardDescription>
+  // Success state after payment is confirmed
+  if (paymentSuccess) {
+    return (
+      <Card className="w-full max-w-lg mx-auto">
+        <CardHeader className="text-center">
+          <div className="mx-auto w-16 h-16 flex items-center justify-center rounded-full bg-green-100 mb-4">
+            <CheckCircle className="h-10 w-10 text-green-600" />
+          </div>
+          <CardTitle>Payment Successful!</CardTitle>
+          <CardDescription>
+            You have successfully subscribed to the {planName} plan.
+          </CardDescription>
         </CardHeader>
-        <form onSubmit={handleSubmit}>
-          <CardContent>
-            <div className="mb-4">
-              <div className="text-sm font-medium text-muted-foreground mb-1">Subscription Details</div>
-              <div className="flex justify-between items-center py-2 border-b">
-                <div className="font-medium">{planName} Plan</div>
-                <div>{planPrice}/month</div>
-              </div>
-            </div>
-            <div className="space-y-4">
-              <PaymentElement />
-            </div>
-          </CardContent>
-          <CardFooter>
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={!stripe || isLoading}
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing
-                </>
-              ) : (
-                "Subscribe Now"
-              )}
-            </Button>
-          </CardFooter>
-        </form>
+        <CardContent>
+          <p className="text-center text-muted-foreground">
+            You will be redirected to the confirmation page shortly...
+          </p>
+        </CardContent>
       </Card>
-    </div>
+    );
+  }
+
+  return (
+    <Card className="w-full max-w-lg mx-auto">
+      <CardHeader>
+        <CardTitle>Subscribe to {planName}</CardTitle>
+        <CardDescription>
+          {planPrice}/month - Unlock advanced features and automation tools
+        </CardDescription>
+      </CardHeader>
+      <form onSubmit={handleSubmit}>
+        <CardContent className="space-y-4">
+          <PaymentElement />
+          
+          <div className="text-sm text-muted-foreground">
+            <p>Your subscription will start immediately. You can cancel anytime.</p>
+          </div>
+        </CardContent>
+        <CardFooter>
+          <Button 
+            type="submit" 
+            className="w-full" 
+            disabled={!stripe || !elements || isProcessing}
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              `Subscribe for ${planPrice}/month`
+            )}
+          </Button>
+        </CardFooter>
+      </form>
+    </Card>
   );
 }

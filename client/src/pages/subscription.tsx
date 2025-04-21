@@ -1,18 +1,20 @@
 import { useState } from "react";
-import { Elements } from "@stripe/react-stripe-js";
-import { loadStripe } from "@stripe/stripe-js";
-import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { loadStripe } from "@stripe/stripe-js";
+import { Elements } from "@stripe/react-stripe-js";
+import { apiRequest } from "@/lib/queryClient";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle } from "lucide-react";
-// Import SubscriptionPlan enum
+
+// Define SubscriptionPlan enum
 enum SubscriptionPlan {
   FREE = 'free',
   PRO = 'pro',
   ENTERPRISE = 'enterprise'
 }
+
 import SubscriptionCheckout from "@/components/subscription/subscription-checkout";
 
 // Load Stripe outside of component to avoid recreating Stripe object on renders
