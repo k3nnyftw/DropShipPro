@@ -189,7 +189,9 @@ router.post('/cancel', isAuthenticated, async (req: any, res) => {
     res.json({ 
       success: true, 
       cancelAtPeriodEnd: true,
-      currentPeriodEnd: new Date(canceledSubscription.current_period_end * 1000)
+      currentPeriodEnd: canceledSubscription.current_period_end 
+        ? new Date(canceledSubscription.current_period_end * 1000)
+        : null
     });
   } catch (error) {
     console.error('Error canceling subscription:', error);
