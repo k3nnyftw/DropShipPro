@@ -11,7 +11,15 @@ export const users = pgTable("users", {
   password: text("password").notNull(),
   email: text("email").notNull(),
   fullName: text("full_name"),
-  plan: text("plan").default(SubscriptionPlan.FREE),
+  plan: text("plan", { 
+    enum: [
+      SubscriptionPlan.FREE, 
+      SubscriptionPlan.PRO, 
+      SubscriptionPlan.ENTERPRISE
+    ] 
+  }).default(SubscriptionPlan.FREE),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
   trialEndsAt: timestamp("trial_ends_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
@@ -92,6 +100,8 @@ export const insertUserSchema = createInsertSchema(users).pick({
   email: true,
   fullName: true,
   plan: true,
+  stripeCustomerId: true,
+  stripeSubscriptionId: true,
   trialEndsAt: true,
 });
 
