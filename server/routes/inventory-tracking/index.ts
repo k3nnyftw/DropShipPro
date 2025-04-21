@@ -1,5 +1,5 @@
 import express from "express";
-import { InventoryTrackingService } from "@/services/inventory-tracking";
+import { InventoryTrackingService } from "../../services/inventory-tracking";
 import { z } from "zod";
 
 const router = express.Router();
