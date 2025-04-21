@@ -5,7 +5,6 @@ import { pgTable, serial, text, integer, boolean, timestamp } from 'drizzle-orm/
 // Define subscription plans and their features
 export enum SubscriptionPlan {
   FREE = 'free',
-  BASIC = 'basic',
   PRO = 'pro',
   ENTERPRISE = 'enterprise'
 }
@@ -23,7 +22,6 @@ export const subscriptions = pgTable('subscriptions', {
   userId: integer('user_id').notNull(),
   plan: text('plan', { enum: [
     SubscriptionPlan.FREE, 
-    SubscriptionPlan.BASIC, 
     SubscriptionPlan.PRO, 
     SubscriptionPlan.ENTERPRISE
   ] }).notNull().default(SubscriptionPlan.FREE),
@@ -67,6 +65,8 @@ export const planFeatureLimits = {
     maxProducts: 10,
     maxOrdersPerDay: 10,
     maxApi: 50, // API requests per day
+    price: 0,
+    description: "Basic access to the platform with limited features. Includes manual product listing, basic store integration, and up to 10 active products.",
     features: {
       // Basic features available in free plan
       basicAnalytics: true,
@@ -89,12 +89,13 @@ export const planFeatureLimits = {
       prioritySupport: false,
     }
   },
-  [SubscriptionPlan.BASIC]: {
-    maxStores: 2,
-    maxProducts: 50,
-    maxOrdersPerDay: 100,
-    maxApi: 500,
-    price: 19.99,
+  [SubscriptionPlan.PRO]: {
+    maxStores: 5,
+    maxProducts: 100,
+    maxOrdersPerDay: 500,
+    maxApi: 2000,
+    price: 29.99,
+    description: "Advanced dropshipping features including automated inventory management, competitor tracking, and AI-powered product descriptions. Includes up to 100 active products and priority customer support.",
     features: {
       // Free features
       basicAnalytics: true,
@@ -102,38 +103,13 @@ export const planFeatureLimits = {
       manualOrderFulfillment: true,
       basicProductDiscovery: true,
       
-      // Additional Basic features
+      // Pro features
       aiPoweredAnalytics: true,
       automatedPriceOptimization: true,
-      automatedOrderFulfillment: false,
+      automatedOrderFulfillment: true,
       demandForecasting: false,
       competitorTracking: true,
       aiProductDescriptions: true,
-      emailMarketing: false,
-      socialMediaAutomation: false,
-      prioritySupport: false,
-    }
-  },
-  [SubscriptionPlan.PRO]: {
-    maxStores: 5,
-    maxProducts: 250,
-    maxOrdersPerDay: 500,
-    maxApi: 2000,
-    price: 49.99,
-    features: {
-      // Basic plan features
-      basicAnalytics: true,
-      basicSupplierSearch: true,
-      manualOrderFulfillment: true,
-      basicProductDiscovery: true,
-      aiPoweredAnalytics: true,
-      automatedPriceOptimization: true,
-      competitorTracking: true,
-      aiProductDescriptions: true,
-      
-      // Additional Pro features
-      automatedOrderFulfillment: true,
-      demandForecasting: true,
       emailMarketing: true,
       socialMediaAutomation: true,
       prioritySupport: false,
@@ -144,7 +120,8 @@ export const planFeatureLimits = {
     maxProducts: 1000,
     maxOrdersPerDay: 2000,
     maxApi: 10000,
-    price: 149.99,
+    price: 99.99,
+    description: "Complete automation suite with unlimited products, real-time price optimization, advanced analytics, demand forecasting, and dedicated account manager. Perfect for high-volume sellers.",
     features: {
       // All features enabled
       basicAnalytics: true,
