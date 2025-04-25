@@ -38,8 +38,12 @@ router.get("/summary", async (req, res) => {
 });
 
 // Get inventory history for a product
-router.get("/history/:productId", async (req, res) => {
+router.get("/history/:productId?", async (req, res) => {
   try {
+    if (!req.params.productId) {
+      return res.json([]);
+    }
+    
     const productId = parseInt(req.params.productId);
     if (isNaN(productId)) {
       return res.status(400).json({ message: "Invalid product ID" });
