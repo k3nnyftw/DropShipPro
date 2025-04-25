@@ -1,14 +1,33 @@
 import Stripe from 'stripe';
 import { SubscriptionPlan } from '@shared/subscription';
 
+// Environment detection for safer handling of Stripe
+const isDevelopment = process.env.NODE_ENV === 'development';
+const isTest = process.env.NODE_ENV === 'test';
+const isProduction = !isDevelopment && !isTest;
+
+// Show warning if in development mode
+if (isDevelopment) {
+  console.log('🛠️ Running in DEVELOPMENT mode with Stripe mock data');
+} else if (isProduction && !process.env.STRIPE_SECRET_KEY) {
+  console.error('⚠️ PRODUCTION MODE: Missing required Stripe secret key!');
+}
+
 // In development mode, we can use a mock key
 const stripeKey = process.env.STRIPE_SECRET_KEY || 
-  (process.env.NODE_ENV === 'development' 
+  (isDevelopment
     ? 'sk_test_mock_key_for_development_only'
     : null);
 
 if (!stripeKey) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+}
+
+// Safety check for production keys being used in development
+if (isDevelopment && process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('sk_live_')) {
+  console.error('⚠️ WARNING: Using LIVE Stripe key in development environment!');
+  console.error('⚠️ This could result in REAL CHARGES to user accounts.');
+  console.error('⚠️ Consider using a test key (sk_test_) instead.');
 }
 
 const stripe = new Stripe(stripeKey, {
@@ -56,7 +75,7 @@ export async function retrieveCheckoutSession(id: string): Promise<Stripe.Checko
 // Helper function to get the correct price ID based on plan
 export function getPriceIdForPlan(plan: SubscriptionPlan): string | null {
   // In development mode, we can use mock price IDs
-  if (process.env.NODE_ENV === 'development') {
+  if (isDevelopment) {
     switch (plan) {
       case SubscriptionPlan.PRO:
         return 'price_mock_pro_plan';
@@ -81,7 +100,7 @@ export function getPriceIdForPlan(plan: SubscriptionPlan): string | null {
 // Create a customer in Stripe
 export async function createStripeCustomer(email: string, name?: string): Promise<Stripe.Customer> {
   // In development mode, return a mock customer
-  if (process.env.NODE_ENV === 'development') {
+  if (isDevelopment) {
     return {
       id: `cus_mock_${Date.now()}`,
       object: 'customer',
