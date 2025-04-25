@@ -1,11 +1,17 @@
 import Stripe from 'stripe';
 import { SubscriptionPlan } from '@shared/subscription';
 
-if (!process.env.STRIPE_SECRET_KEY) {
+// In development mode, we can use a mock key
+const stripeKey = process.env.STRIPE_SECRET_KEY || 
+  (process.env.NODE_ENV === 'development' 
+    ? 'sk_test_mock_key_for_development_only'
+    : null);
+
+if (!stripeKey) {
   throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
 }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+const stripe = new Stripe(stripeKey, {
   apiVersion: '2023-10-16' as any, // TypeScript issue with stripe version
 });
 
@@ -49,6 +55,19 @@ export async function retrieveCheckoutSession(id: string): Promise<Stripe.Checko
 
 // Helper function to get the correct price ID based on plan
 export function getPriceIdForPlan(plan: SubscriptionPlan): string | null {
+  // In development mode, we can use mock price IDs
+  if (process.env.NODE_ENV === 'development') {
+    switch (plan) {
+      case SubscriptionPlan.PRO:
+        return 'price_mock_pro_plan';
+      case SubscriptionPlan.ENTERPRISE:
+        return 'price_mock_enterprise_plan';
+      default:
+        return null; // Free plan has no price ID
+    }
+  }
+  
+  // In production, use real price IDs
   switch (plan) {
     case SubscriptionPlan.PRO:
       return process.env.STRIPE_PRICE_ID || null;
@@ -61,6 +80,24 @@ export function getPriceIdForPlan(plan: SubscriptionPlan): string | null {
 
 // Create a customer in Stripe
 export async function createStripeCustomer(email: string, name?: string): Promise<Stripe.Customer> {
+  // In development mode, return a mock customer
+  if (process.env.NODE_ENV === 'development') {
+    return {
+      id: `cus_mock_${Date.now()}`,
+      object: 'customer',
+      email,
+      name: name || undefined,
+      balance: 0,
+      created: Math.floor(Date.now() / 1000),
+      currency: 'usd',
+      default_source: null,
+      delinquent: false,
+      metadata: {
+        source: 'dropship-platform'
+      }
+    } as unknown as Stripe.Customer;
+  }
+  
   return stripe.customers.create({
     email,
     name: name || undefined,
@@ -77,6 +114,19 @@ export async function createSubscriptionCheckoutSession(
   successUrl: string,
   cancelUrl: string
 ): Promise<Stripe.Checkout.Session> {
+  // In development mode, return a mock session
+  if (process.env.NODE_ENV === 'development') {
+    return {
+      id: `cs_mock_${Date.now()}`,
+      object: 'checkout.session',
+      url: successUrl, // In development, go directly to success URL
+      client_secret: `cs_secret_mock_${Date.now()}`,
+      customer: customerId,
+      payment_status: 'paid',
+      status: 'complete',
+    } as unknown as Stripe.Checkout.Session;
+  }
+  
   return stripe.checkout.sessions.create({
     customer: customerId,
     payment_method_types: ['card'],
@@ -97,6 +147,26 @@ export async function createSubscription(
   customerId: string,
   priceId: string
 ): Promise<Stripe.Subscription> {
+  // In development mode, return a mock subscription
+  if (process.env.NODE_ENV === 'development') {
+    return {
+      id: `sub_mock_${Date.now()}`,
+      customer: customerId,
+      status: 'active',
+      current_period_start: Math.floor(Date.now() / 1000),
+      current_period_end: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60, // 30 days from now
+      cancel_at_period_end: false,
+      items: {
+        data: [
+          {
+            id: `si_mock_${Date.now()}`,
+            price: { id: priceId } as any,
+          }
+        ]
+      }
+    } as unknown as Stripe.Subscription;
+  }
+  
   return stripe.subscriptions.create({
     customer: customerId,
     items: [
@@ -111,6 +181,25 @@ export async function createSubscription(
 
 // Retrieve a subscription
 export async function retrieveSubscription(subscriptionId: string): Promise<Stripe.Subscription> {
+  // In development mode, return a mock subscription
+  if (process.env.NODE_ENV === 'development') {
+    return {
+      id: subscriptionId,
+      status: 'active',
+      current_period_start: Math.floor(Date.now() / 1000),
+      current_period_end: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60, // 30 days from now
+      cancel_at_period_end: false,
+      items: {
+        data: [
+          {
+            id: `si_mock_${Date.now()}`,
+            price: { id: 'price_mock_subscription' } as any,
+          }
+        ]
+      }
+    } as unknown as Stripe.Subscription;
+  }
+  
   return stripe.subscriptions.retrieve(subscriptionId, {
     expand: ['customer', 'default_payment_method']
   });
@@ -118,6 +207,25 @@ export async function retrieveSubscription(subscriptionId: string): Promise<Stri
 
 // Cancel a subscription at period end
 export async function cancelSubscription(subscriptionId: string): Promise<Stripe.Subscription> {
+  // In development mode, return a mock subscription
+  if (process.env.NODE_ENV === 'development') {
+    return {
+      id: subscriptionId,
+      status: 'active',
+      current_period_start: Math.floor(Date.now() / 1000),
+      current_period_end: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60, // 30 days from now
+      cancel_at_period_end: true, // This is the key change
+      items: {
+        data: [
+          {
+            id: `si_mock_${Date.now()}`,
+            price: { id: 'price_mock_subscription' } as any,
+          }
+        ]
+      }
+    } as unknown as Stripe.Subscription;
+  }
+  
   return stripe.subscriptions.update(subscriptionId, {
     cancel_at_period_end: true
   });
@@ -128,6 +236,25 @@ export async function updateSubscription(
   subscriptionId: string,
   newPriceId: string
 ): Promise<Stripe.Subscription> {
+  // In development mode, return a mock subscription
+  if (process.env.NODE_ENV === 'development') {
+    return {
+      id: subscriptionId,
+      status: 'active',
+      current_period_start: Math.floor(Date.now() / 1000),
+      current_period_end: Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60, // 30 days from now
+      cancel_at_period_end: false,
+      items: {
+        data: [
+          {
+            id: `si_mock_${Date.now()}`,
+            price: { id: newPriceId } as any, // Using the new price ID
+          }
+        ]
+      }
+    } as unknown as Stripe.Subscription;
+  }
+  
   // Get the subscription
   const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   
