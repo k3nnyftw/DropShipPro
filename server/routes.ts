@@ -8,7 +8,7 @@ import aiAnalyticsRoutes from "./routes/ai-analytics";
 import priceOptimizerRoutes from "./routes/price-optimizer";
 import orderFulfillmentRoutes from "./routes/order-fulfillment";
 import inventoryManagerRoutes from "./routes/inventory-manager";
-import inventoryTrackingRoutes from "./routes/inventory-tracking";
+import inventoryTrackingRoutes from "./routes/inventory-tracking/index";
 import demandForecastingRoutes from "./routes/demand-forecasting";
 import competitorTrackingRoutes from "./routes/competitor-tracking";
 import productDescriptionRoutes from "./routes/product-description-generator";

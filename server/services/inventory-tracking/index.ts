@@ -1,7 +1,6 @@
 import { 
-  Product, 
-  InsertProduct, 
-  InventoryHistory, 
+  type Product, 
+  type InventoryHistory, 
   InsertInventoryHistory, 
   products,
   inventoryHistory
