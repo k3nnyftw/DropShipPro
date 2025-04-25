@@ -6,28 +6,37 @@ const isDevelopment = process.env.NODE_ENV === 'development';
 const isTest = process.env.NODE_ENV === 'test';
 const isProduction = !isDevelopment && !isTest;
 
-// Show warning if in development mode
+// Show info about the current environment
 if (isDevelopment) {
   console.log('🛠️ Running in DEVELOPMENT mode with Stripe mock data');
 } else if (isProduction && !process.env.STRIPE_SECRET_KEY) {
   console.error('⚠️ PRODUCTION MODE: Missing required Stripe secret key!');
 }
 
-// In development mode, we can use a mock key
-const stripeKey = process.env.STRIPE_SECRET_KEY || 
-  (isDevelopment
-    ? 'sk_test_mock_key_for_development_only'
-    : null);
-
-if (!stripeKey) {
-  throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
-}
-
 // Safety check for production keys being used in development
-if (isDevelopment && process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('sk_live_')) {
-  console.error('⚠️ WARNING: Using LIVE Stripe key in development environment!');
-  console.error('⚠️ This could result in REAL CHARGES to user accounts.');
-  console.error('⚠️ Consider using a test key (sk_test_) instead.');
+let stripeKey: string;
+if (isDevelopment) {
+  if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('sk_live_')) {
+    console.error('⚠️ WARNING: LIVE Stripe key detected in development environment!');
+    console.error('⚠️ This could result in REAL CHARGES to user accounts.');
+    console.error('⚠️ Using mock key instead for safety.');
+    
+    // Force use of a mock key in development regardless of environment variable
+    stripeKey = 'sk_test_mock_key_for_development_only';
+  } else if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.startsWith('sk_test_')) {
+    console.log('ℹ️ Using test Stripe key in development mode.');
+    stripeKey = process.env.STRIPE_SECRET_KEY;
+  } else {
+    console.log('ℹ️ No valid Stripe key found, using mock key.');
+    stripeKey = 'sk_test_mock_key_for_development_only';
+  }
+} else {
+  // Production mode requires a real API key
+  stripeKey = process.env.STRIPE_SECRET_KEY || '';
+  
+  if (!stripeKey) {
+    throw new Error('Missing required Stripe secret: STRIPE_SECRET_KEY');
+  }
 }
 
 const stripe = new Stripe(stripeKey, {
@@ -134,7 +143,7 @@ export async function createSubscriptionCheckoutSession(
   cancelUrl: string
 ): Promise<Stripe.Checkout.Session> {
   // In development mode, return a mock session
-  if (process.env.NODE_ENV === 'development') {
+  if (isDevelopment) {
     return {
       id: `cs_mock_${Date.now()}`,
       object: 'checkout.session',
@@ -167,7 +176,7 @@ export async function createSubscription(
   priceId: string
 ): Promise<Stripe.Subscription> {
   // In development mode, return a mock subscription
-  if (process.env.NODE_ENV === 'development') {
+  if (isDevelopment) {
     return {
       id: `sub_mock_${Date.now()}`,
       customer: customerId,
@@ -201,7 +210,7 @@ export async function createSubscription(
 // Retrieve a subscription
 export async function retrieveSubscription(subscriptionId: string): Promise<Stripe.Subscription> {
   // In development mode, return a mock subscription
-  if (process.env.NODE_ENV === 'development') {
+  if (isDevelopment) {
     return {
       id: subscriptionId,
       status: 'active',
@@ -227,7 +236,7 @@ export async function retrieveSubscription(subscriptionId: string): Promise<Stri
 // Cancel a subscription at period end
 export async function cancelSubscription(subscriptionId: string): Promise<Stripe.Subscription> {
   // In development mode, return a mock subscription
-  if (process.env.NODE_ENV === 'development') {
+  if (isDevelopment) {
     return {
       id: subscriptionId,
       status: 'active',
@@ -256,7 +265,7 @@ export async function updateSubscription(
   newPriceId: string
 ): Promise<Stripe.Subscription> {
   // In development mode, return a mock subscription
-  if (process.env.NODE_ENV === 'development') {
+  if (isDevelopment) {
     return {
       id: subscriptionId,
       status: 'active',
