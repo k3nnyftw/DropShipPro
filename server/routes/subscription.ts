@@ -19,7 +19,26 @@ const changePlanSchema = z.object({
 });
 
 // Helper to check if user is authenticated
+// For development, this is a mock authentication middleware
 function isAuthenticated(req: any, res: express.Response, next: express.NextFunction) {
+  // In development, skip authentication and assign a mock user
+  if (process.env.NODE_ENV === 'development') {
+    // Create mock authenticated user if not exists
+    if (!req.user) {
+      req.user = {
+        id: 1,
+        username: 'dev_user',
+        email: 'dev@example.com',
+        fullName: 'Development User',
+        stripeCustomerId: null
+      };
+    }
+    // Mock isAuthenticated function
+    req.isAuthenticated = () => true;
+    return next();
+  }
+  
+  // In production, use real authentication
   if (!req.isAuthenticated || !req.isAuthenticated()) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
@@ -411,8 +430,81 @@ async function handleSubscriptionDeleted(stripeSubscription: any) {
   }
 }
 
+// Feature access endpoint - determine if a feature is accessible to the user
+router.get('/feature-access/:feature', async (req: any, res) => {
+  try {
+    const { feature } = req.params;
+    
+    // In development mode, all features are accessible
+    if (process.env.NODE_ENV === 'development') {
+      return res.json({ 
+        hasAccess: true,
+        reason: 'Development mode - all features available'
+      });
+    }
+    
+    // In production, check if user is authenticated
+    if (!req.isAuthenticated || !req.isAuthenticated()) {
+      return res.json({
+        hasAccess: false,
+        reason: 'Authentication required'
+      });
+    }
+    
+    const userId = req.user.id;
+    const subscription = await storage.getUserSubscription(userId);
+    
+    // Default to free plan if no subscription exists
+    const plan = subscription?.plan || SubscriptionPlan.FREE;
+    
+    // Check if the requested feature exists in the feature set
+    if (!(feature in planFeatureLimits[SubscriptionPlan.FREE].features)) {
+      return res.status(400).json({ 
+        error: 'Invalid feature',
+        validFeatures: Object.keys(planFeatureLimits[SubscriptionPlan.FREE].features)
+      });
+    }
+    
+    // Check if the user's plan has access to this feature
+    const hasAccess = hasFeatureAccess(plan, feature as keyof typeof planFeatureLimits[SubscriptionPlan.FREE]['features']);
+    
+    res.json({
+      hasAccess,
+      plan,
+      reason: hasAccess ? 'Feature available in your plan' : 'Feature requires upgrade'
+    });
+  } catch (error) {
+    console.error('Error checking feature access:', error);
+    res.status(500).json({ error: 'Failed to check feature access' });
+  }
+});
+
+// Get all subscription plans
+router.get('/plans', async (req, res) => {
+  try {
+    const plans = Object.values(SubscriptionPlan).map(plan => ({
+      id: plan,
+      name: planFeatureLimits[plan].title || plan.charAt(0).toUpperCase() + plan.slice(1),
+      price: planFeatureLimits[plan].price,
+      description: planFeatureLimits[plan].description,
+      features: planFeatureLimits[plan].features,
+      limits: {
+        maxStores: planFeatureLimits[plan].maxStores,
+        maxProducts: planFeatureLimits[plan].maxProducts,
+        maxOrdersPerDay: planFeatureLimits[plan].maxOrdersPerDay,
+        maxApi: planFeatureLimits[plan].maxApi,
+      }
+    }));
+    
+    res.json(plans);
+  } catch (error) {
+    console.error('Error fetching subscription plans:', error);
+    res.status(500).json({ error: 'Failed to fetch subscription plans' });
+  }
+});
+
 // Import Subscription type for webhook handling
 import { MemStorage } from '../storage';
-import { Subscription } from '@shared/subscription';
+import { Subscription, hasFeatureAccess } from '@shared/subscription';
 
 export default router;

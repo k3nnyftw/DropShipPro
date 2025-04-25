@@ -56,11 +56,17 @@ export const insertSubscriptionSchema = createInsertSchema(subscriptions).pick({
 
 // Define the types
 export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
-export type Subscription = typeof subscriptions.$inferSelect;
+export type Subscription = typeof subscriptions.$inferSelect & {
+  // Extra fields that might come from Stripe
+  current_period_start?: Date;
+  current_period_end?: Date;
+  cancel_at_period_end?: boolean;
+};
 
 // Define feature limits for each plan
 export const planFeatureLimits = {
   [SubscriptionPlan.FREE]: {
+    title: "Free",
     maxStores: 1,
     maxProducts: 10,
     maxOrdersPerDay: 10,
@@ -90,6 +96,7 @@ export const planFeatureLimits = {
     }
   },
   [SubscriptionPlan.PRO]: {
+    title: "Pro",
     maxStores: 5,
     maxProducts: 100,
     maxOrdersPerDay: 500,
@@ -116,6 +123,7 @@ export const planFeatureLimits = {
     }
   },
   [SubscriptionPlan.ENTERPRISE]: {
+    title: "Enterprise",
     maxStores: 10,
     maxProducts: 1000,
     maxOrdersPerDay: 2000,
