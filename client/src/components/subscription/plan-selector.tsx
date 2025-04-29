@@ -139,7 +139,7 @@ export function PlanSelector({ open: externalOpen, onOpenChange }: PlanSelectorP
           Subscription Plans
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[900px]">
+      <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Choose Your Subscription Plan</DialogTitle>
           <DialogDescription>
