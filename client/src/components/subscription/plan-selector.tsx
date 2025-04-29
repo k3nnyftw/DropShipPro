@@ -15,13 +15,17 @@ type PlanFeature = {
 };
 
 type SubscriptionPlan = {
+  id: string;
   name: string;
   price?: number;
-  maxStores: number;
-  maxProducts: number;
-  maxOrdersPerDay: number;
-  maxApi: number;
-  features: PlanFeature[];
+  description: string;
+  features: Record<string, boolean>;
+  limits: {
+    maxStores: number;
+    maxProducts: number;
+    maxOrdersPerDay: number;
+    maxApi: number;
+  };
 };
 
 type CurrentSubscription = {
@@ -178,29 +182,29 @@ export function PlanSelector({ open: externalOpen, onOpenChange }: PlanSelectorP
                 <CardContent className="flex-grow">
                   <div className="space-y-2">
                     <p className="text-sm">
-                      <strong>{plan.maxStores}</strong> store{plan.maxStores !== 1 ? 's' : ''}
+                      <strong>{plan.limits.maxStores}</strong> store{plan.limits.maxStores !== 1 ? 's' : ''}
                     </p>
                     <p className="text-sm">
-                      <strong>{plan.maxProducts}</strong> product{plan.maxProducts !== 1 ? 's' : ''}
+                      <strong>{plan.limits.maxProducts}</strong> product{plan.limits.maxProducts !== 1 ? 's' : ''}
                     </p>
                     <p className="text-sm">
-                      <strong>{plan.maxOrdersPerDay}</strong> orders/day
+                      <strong>{plan.limits.maxOrdersPerDay}</strong> orders/day
                     </p>
                     <p className="text-sm">
-                      <strong>{plan.maxApi}</strong> API calls/day
+                      <strong>{plan.limits.maxApi}</strong> API calls/day
                     </p>
                   </div>
                   <div className="mt-4 space-y-2">
                     <p className="text-sm font-medium">Features:</p>
                     <ul className="space-y-1">
-                      {plan.features.map((feature) => (
-                        <li key={feature.name} className={`text-sm flex items-start ${!feature.enabled ? 'text-slate-400' : ''}`}>
-                          {feature.enabled ? (
+                      {plan.features && typeof plan.features === 'object' && Object.entries(plan.features).map(([featureName, enabled]) => (
+                        <li key={featureName} className={`text-sm flex items-start ${!enabled ? 'text-slate-400' : ''}`}>
+                          {enabled ? (
                             <Check className="h-4 w-4 mr-2 text-green-500 flex-shrink-0 mt-0.5" />
                           ) : (
                             <span className="h-4 w-4 mr-2 flex-shrink-0 mt-0.5 flex items-center justify-center">-</span>
                           )}
-                          <span>{formatFeatureName(feature.name)}</span>
+                          <span>{formatFeatureName(featureName)}</span>
                         </li>
                       ))}
                     </ul>
