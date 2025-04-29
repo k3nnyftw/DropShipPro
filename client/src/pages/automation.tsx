@@ -43,7 +43,7 @@ const Automation: React.FC = () => {
         </div>
       </div>
 
-      <Tabs defaultValue="demand-forecasting" className="space-y-8">
+      <Tabs defaultValue="demand-forecasting" className="space-y-8 overflow-y-auto pb-8">
         <TabsList className="grid grid-cols-4 w-full max-w-3xl mx-auto mb-4">
           <TabsTrigger value="demand-forecasting" className="flex items-center justify-center gap-2">
             <Brain className="h-4 w-4" />
