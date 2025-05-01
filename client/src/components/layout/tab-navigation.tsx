@@ -23,6 +23,13 @@ const TabNavigation: React.FC = () => {
             <Link 
               key={tab.path} 
               href={tab.path}
+              onClick={(e) => {
+                // For any non-functioning tab, prevent default and handle manually
+                if (tab.path === "/store") {
+                  e.preventDefault();
+                  window.location.href = tab.path;
+                }
+              }}
               className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
                 (location === tab.path || 
                  (location === "/" && tab.path === "/")) ?

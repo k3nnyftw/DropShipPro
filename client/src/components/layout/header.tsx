@@ -67,16 +67,18 @@ const Header: React.FC = () => {
           </Button>
           
           <div className="relative">
-            <Button variant="ghost" size="sm" className="flex items-center text-sm focus:outline-none">
-              <Avatar className="h-8 w-8">
-                <AvatarImage 
-                  src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" 
-                  alt="User profile" 
-                />
-                <AvatarFallback>A</AvatarFallback>
-              </Avatar>
-              <span className="hidden md:block ml-2 font-medium">Alex</span>
-            </Button>
+            <Link href="/settings/subscription">
+              <Button variant="ghost" size="sm" className="flex items-center text-sm focus:outline-none">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage 
+                    src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" 
+                    alt="User profile" 
+                  />
+                  <AvatarFallback>A</AvatarFallback>
+                </Avatar>
+                <span className="hidden md:block ml-2 font-medium">Alex</span>
+              </Button>
+            </Link>
           </div>
           
           <Button
