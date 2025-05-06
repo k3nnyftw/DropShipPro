@@ -67,10 +67,10 @@ export type Subscription = typeof subscriptions.$inferSelect & {
 export const planFeatureLimits = {
   [SubscriptionPlan.FREE]: {
     title: "Free",
-    maxStores: 1,
-    maxProducts: 10,
-    maxOrdersPerDay: 10,
-    maxApi: 50, // API requests per day
+    maxStores: 10, // TEMPORARY: Increased for testing
+    maxProducts: 1000, // TEMPORARY: Increased for testing
+    maxOrdersPerDay: 2000, // TEMPORARY: Increased for testing
+    maxApi: 10000, // TEMPORARY: Increased API requests for testing
     price: 0,
     description: "Basic access to the platform with limited features. Includes manual product listing, basic store integration, and up to 10 active products.",
     features: {
@@ -83,16 +83,16 @@ export const planFeatureLimits = {
       // IMPORTANT: In development mode, these features are still accessible 
       // even though they're marked as false here (see feature-access route)
       
-      // Advanced features - require paid subscription
-      aiPoweredAnalytics: false,
-      automatedPriceOptimization: false,
-      automatedOrderFulfillment: false,
-      demandForecasting: false,
-      competitorTracking: false,
-      aiProductDescriptions: false,
-      emailMarketing: false,
-      socialMediaAutomation: false,
-      prioritySupport: false,
+      // TEMPORARY: All features enabled for testing
+      aiPoweredAnalytics: true,
+      automatedPriceOptimization: true,
+      automatedOrderFulfillment: true,
+      demandForecasting: true,
+      competitorTracking: true,
+      aiProductDescriptions: true,
+      emailMarketing: true,
+      socialMediaAutomation: true,
+      prioritySupport: true, // Also enabling priority support for testing
     }
   },
   [SubscriptionPlan.PRO]: {
