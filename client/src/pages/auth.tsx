@@ -1,123 +1,134 @@
-import React, { useState, useContext } from 'react';
-import { useLocation } from 'wouter';
-import { AuthContext } from '../App';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Label } from '@/components/ui/label';
-import { useToast } from '@/hooks/use-toast';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2 } from 'lucide-react';
+import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { useToast } from "@/hooks/use-toast";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
+import { useContext } from "react";
+import { AuthContext } from "../App";
+import { useLocation } from "wouter";
 
-type AuthFormData = {
-  username: string;
-  password: string;
-  email?: string;
-  name?: string;
-};
+// Form validation schema
+const loginSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+const registerSchema = z.object({
+  username: z.string().min(3, "Username must be at least 3 characters"),
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+  confirmPassword: z.string(),
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords do not match",
+  path: ["confirmPassword"]
+});
 
 export default function AuthPage() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
-  const [formData, setFormData] = useState<AuthFormData>({
-    username: '',
-    password: '',
-    email: '',
-    name: '',
-  });
-  const { setUser, user } = useContext(AuthContext);
-  const [, setLocation] = useLocation();
+  const [activeTab, setActiveTab] = useState<string>("login");
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const { toast } = useToast();
-
-  // Redirect to dashboard if already logged in
+  const { user, setUser } = useContext(AuthContext);
+  const [, navigate] = useLocation();
+  
+  // Redirect to dashboard if user is already authenticated
   if (user) {
-    setLocation('/');
+    navigate("/");
     return null;
   }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
-  };
+  // Login form
+  const loginForm = useForm<z.infer<typeof loginSchema>>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+    },
+  });
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Register form
+  const registerForm = useForm<z.infer<typeof registerSchema>>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      username: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
+  // Handle login form submission
+  const onLoginSubmit = async (values: z.infer<typeof loginSchema>) => {
     setIsLoading(true);
-
     try {
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: formData.username,
-          password: formData.password,
-        }),
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(values),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Login failed');
+        throw new Error(errorData.message || "Login failed");
       }
 
       const userData = await response.json();
       setUser(userData);
-      setLocation('/');
-      
       toast({
-        title: 'Login Successful',
-        description: 'Welcome to DropShipify!',
+        title: "Login successful",
+        description: `Welcome back, ${userData.username}!`,
       });
+      navigate("/");
     } catch (error) {
-      console.error('Login error:', error);
       toast({
-        title: 'Login Failed',
-        description: error instanceof Error ? error.message : 'Invalid credentials',
-        variant: 'destructive',
+        title: "Login failed",
+        description: error instanceof Error ? error.message : "Unable to login",
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Handle register form submission
+  const onRegisterSubmit = async (values: z.infer<typeof registerSchema>) => {
     setIsLoading(true);
-
     try {
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+      // Remove confirmPassword as it's not needed in the API call
+      const { confirmPassword, ...registrationData } = values;
+      
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(registrationData),
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Registration failed');
+        throw new Error(errorData.message || "Registration failed");
       }
 
       const userData = await response.json();
       setUser(userData);
-      setLocation('/');
-      
       toast({
-        title: 'Registration Successful',
-        description: 'Your account has been created!',
+        title: "Registration successful",
+        description: "Your account has been created and you're now logged in.",
       });
+      navigate("/");
     } catch (error) {
-      console.error('Registration error:', error);
       toast({
-        title: 'Registration Failed',
-        description: error instanceof Error ? error.message : 'Could not create account',
-        variant: 'destructive',
+        title: "Registration failed",
+        description: error instanceof Error ? error.message : "Unable to register",
+        variant: "destructive",
       });
     } finally {
       setIsLoading(false);
@@ -125,177 +136,236 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-      <div className="w-full max-w-6xl grid md:grid-cols-2 gap-6 items-center">
-        <Card className="w-full max-w-md mx-auto">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold">Welcome to DropShipify</CardTitle>
-            <CardDescription>
-              {activeTab === 'login'
-                ? 'Sign in to your account to access your dropshipping dashboard'
-                : 'Create a new account to start your dropshipping business'}
-            </CardDescription>
-          </CardHeader>
-
-          <Tabs defaultValue="login" value={activeTab} onValueChange={(v) => setActiveTab(v as 'login' | 'register')}>
+    <div className="container flex h-screen items-center justify-center">
+      <div className="grid w-full max-w-6xl gap-8 md:grid-cols-2">
+        {/* Auth form */}
+        <div className="flex flex-col justify-center space-y-6">
+          <div className="flex flex-col space-y-2 text-center">
+            <h1 className="text-3xl font-bold tracking-tight">Welcome to DropshipAI</h1>
+            <p className="text-muted-foreground">
+              {activeTab === "login" 
+                ? "Sign in to your account to continue" 
+                : "Create an account to get started"}
+            </p>
+          </div>
+          
+          <Tabs defaultValue="login" value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="register">Register</TabsTrigger>
             </TabsList>
-
+            
             <TabsContent value="login">
-              <form onSubmit={handleLogin}>
-                <CardContent className="space-y-4 pt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="login-username">Username</Label>
-                    <Input
-                      id="login-username"
-                      name="username"
-                      placeholder="Your username"
-                      required
-                      value={formData.username}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="login-password">Password</Label>
-                    <Input
-                      id="login-password"
-                      name="password"
-                      type="password"
-                      placeholder="Your password"
-                      required
-                      value={formData.password}
-                      onChange={handleChange}
-                    />
-                  </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Login</CardTitle>
+                  <CardDescription>
+                    Enter your credentials to access your account
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...loginForm}>
+                    <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
+                      <FormField
+                        control={loginForm.control}
+                        name="username"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Username</FormLabel>
+                            <FormControl>
+                              <Input placeholder="your_username" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={loginForm.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Password</FormLabel>
+                            <FormControl>
+                              <Input type="password" placeholder="••••••••" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <Button type="submit" className="w-full" disabled={isLoading}>
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                            Signing in...
+                          </>
+                        ) : (
+                          "Sign In"
+                        )}
+                      </Button>
+                    </form>
+                  </Form>
                 </CardContent>
-                <CardFooter>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Signing in...
-                      </>
-                    ) : (
-                      'Sign In'
-                    )}
+                <CardFooter className="flex justify-center">
+                  <Button 
+                    variant="link" 
+                    onClick={() => setActiveTab("register")}
+                    className="text-xs text-muted-foreground"
+                  >
+                    Don't have an account? Sign up
                   </Button>
                 </CardFooter>
-              </form>
+              </Card>
             </TabsContent>
-
+            
             <TabsContent value="register">
-              <form onSubmit={handleRegister}>
-                <CardContent className="space-y-4 pt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="register-name">Full Name</Label>
-                    <Input
-                      id="register-name"
-                      name="name"
-                      placeholder="Your full name"
-                      value={formData.name}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="register-email">Email Address</Label>
-                    <Input
-                      id="register-email"
-                      name="email"
-                      type="email"
-                      placeholder="your.email@example.com"
-                      required
-                      value={formData.email}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="register-username">Username</Label>
-                    <Input
-                      id="register-username"
-                      name="username"
-                      placeholder="Choose a username"
-                      required
-                      value={formData.username}
-                      onChange={handleChange}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="register-password">Password</Label>
-                    <Input
-                      id="register-password"
-                      name="password"
-                      type="password"
-                      placeholder="Create a password"
-                      required
-                      value={formData.password}
-                      onChange={handleChange}
-                    />
-                  </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Create an Account</CardTitle>
+                  <CardDescription>
+                    Enter your information to create a new account
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...registerForm}>
+                    <form onSubmit={registerForm.handleSubmit(onRegisterSubmit)} className="space-y-4">
+                      <FormField
+                        control={registerForm.control}
+                        name="username"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Username</FormLabel>
+                            <FormControl>
+                              <Input placeholder="your_username" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={registerForm.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input type="email" placeholder="you@example.com" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={registerForm.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Password</FormLabel>
+                            <FormControl>
+                              <Input type="password" placeholder="••••••••" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <FormField
+                        control={registerForm.control}
+                        name="confirmPassword"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Confirm Password</FormLabel>
+                            <FormControl>
+                              <Input type="password" placeholder="••••••••" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      
+                      <Button type="submit" className="w-full" disabled={isLoading}>
+                        {isLoading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" /> 
+                            Creating account...
+                          </>
+                        ) : (
+                          "Create Account"
+                        )}
+                      </Button>
+                    </form>
+                  </Form>
                 </CardContent>
-                <CardFooter>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creating account...
-                      </>
-                    ) : (
-                      'Create Account'
-                    )}
+                <CardFooter className="flex justify-center">
+                  <Button 
+                    variant="link" 
+                    onClick={() => setActiveTab("login")}
+                    className="text-xs text-muted-foreground"
+                  >
+                    Already have an account? Sign in
                   </Button>
                 </CardFooter>
-              </form>
+              </Card>
             </TabsContent>
           </Tabs>
-        </Card>
-
-        <div className="hidden md:flex flex-col space-y-4">
-          <div className="text-center mb-4">
-            <h1 className="text-3xl font-bold mb-2">
-              The Ultimate Dropshipping Automation Platform
-            </h1>
-            <p className="text-lg text-gray-700">
-              Leverage AI and automation to maximize your profits
-            </p>
-          </div>
-
-          <div className="space-y-6">
-            <div className="flex gap-4 items-start">
-              <div className="bg-primary/10 p-3 rounded-full">
-                <svg className="h-6 w-6 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+        </div>
+        
+        {/* Hero section */}
+        <div className="relative hidden rounded-lg bg-gradient-to-br from-primary/80 to-primary-foreground/20 p-10 text-white backdrop-blur-sm md:block">
+          <div className="max-w-md space-y-8">
+            <div>
+              <h2 className="text-3xl font-bold tracking-tight">Dropshipping Automated</h2>
+              <p className="mt-4 text-gray-200">
+                Maximize your profits with our cutting-edge AI-powered platform. 
+                We handle the heavy lifting so you can focus on growing your business.
+              </p>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center space-x-3">
+                <div className="rounded-full bg-white/10 p-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
+                <span>AI-powered product trend analysis</span>
               </div>
-              <div>
-                <h3 className="font-semibold text-lg">Automated Order Fulfillment</h3>
-                <p className="text-gray-600">Let AI handle your order processing and fulfillment automatically</p>
+              
+              <div className="flex items-center space-x-3">
+                <div className="rounded-full bg-white/10 p-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
+                <span>Automated price optimization</span>
+              </div>
+              
+              <div className="flex items-center space-x-3">
+                <div className="rounded-full bg-white/10 p-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
+                <span>Automated order fulfillment</span>
+              </div>
+              
+              <div className="flex items-center space-x-3">
+                <div className="rounded-full bg-white/10 p-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-check">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
+                <span>Real-time competitor price tracking</span>
               </div>
             </div>
-
-            <div className="flex gap-4 items-start">
-              <div className="bg-primary/10 p-3 rounded-full">
-                <svg className="h-6 w-6 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg">Real-time Price Optimization</h3>
-                <p className="text-gray-600">Maximize profits with dynamic pricing based on market conditions</p>
-              </div>
-            </div>
-
-            <div className="flex gap-4 items-start">
-              <div className="bg-primary/10 p-3 rounded-full">
-                <svg className="h-6 w-6 text-primary" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg">AI-Powered Product Research</h3>
-                <p className="text-gray-600">Discover high-profit products using advanced AI algorithms</p>
-              </div>
+            
+            <div className="absolute bottom-10 right-10 opacity-50">
+              <svg width="124" height="124" viewBox="0 0 124 124" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M62 0C27.8 0 0 27.8 0 62C0 96.2 27.8 124 62 124C96.2 124 124 96.2 124 62C124 27.8 96.2 0 62 0ZM45.4 88.5L25.8 68.9C24.2 67.3 24.2 64.8 25.8 63.2L30.7 58.3C32.3 56.7 34.8 56.7 36.4 58.3L49.3 71.2L80.2 40.3C81.8 38.7 84.3 38.7 85.9 40.3L90.8 45.2C92.4 46.8 92.4 49.3 90.8 50.9L53.2 88.5C51.6 90.1 49.1 90.1 47.5 88.5H45.4Z" fill="white"/>
+              </svg>
             </div>
           </div>
         </div>
