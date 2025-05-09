@@ -3,6 +3,8 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import session from "express-session";
+import { v4 as uuidv4 } from "uuid";
 
 const app = express();
 

@@ -1,5 +1,5 @@
-import { Route, Switch, useLocation } from "wouter";
-import { Suspense, lazy, useEffect, useCallback } from "react";
+import { Route, Switch, useLocation, Redirect } from "wouter";
+import { Suspense, lazy, useEffect, useCallback, createContext, useState, useContext } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import MainLayout from "@/components/layout/main-layout";
 import { ThemeProvider } from "@/contexts/ThemeContext";
@@ -13,6 +13,27 @@ import {
   useAnnouncement
 } from "@/lib/accessibility";
 import { globalErrorHandler } from "@/lib/defensive";
+// Import auth page directly to fix import issues
+import AuthPage from "./pages/auth";
+
+// Define User type
+export type User = {
+  id: number;
+  username: string;
+  email: string;
+  name?: string;
+};
+
+// Create auth context
+export const AuthContext = createContext<{
+  user: User | null;
+  setUser: (user: User | null) => void;
+  isLoading: boolean;
+}>({
+  user: null,
+  setUser: () => {},
+  isLoading: true,
+});
 
 // Lazy load all page components
 const Dashboard = lazyImportDefault(() => import("@/pages/dashboard"));
@@ -94,6 +115,9 @@ function AppContent() {
     'escape': () => document.activeElement instanceof HTMLElement && document.activeElement.blur(),
   };
   
+  // Access auth context to check if user is authenticated
+  const { user, isLoading } = useContext(AuthContext);
+  
   return (
     <>
       <SkipToContent />
@@ -101,47 +125,116 @@ function AppContent() {
       <KeyboardShortcuts shortcuts={shortcuts} />
       
       <ThemeProvider>
-        <MainLayout>
+        {location === '/auth' ? (
           <main id="main-content" tabIndex={-1} className="outline-none">
             <ErrorBoundary>
               <Suspense fallback={<PageLoader />}>
-                <Switch>
-                  <Route path="/" component={Dashboard} />
-                  <Route path="/store" component={StoreView} />
-                  <Route path="/product-discovery" component={ProductDiscovery} />
-                  <Route path="/supplier-analysis" component={SupplierAnalysis} />
-                  <Route path="/advertising" component={Advertising} />
-                  <Route path="/orders" component={Orders} />
-                  <Route path="/automation" component={Automation} />
-                  <Route path="/competitor-tracking" component={CompetitorTrackingPage} />
-                  <Route path="/product-description-generator" component={ProductDescriptionGeneratorPage} />
-                  <Route path="/email-marketing" component={EmailMarketingPage} />
-                  <Route path="/social-sharing" component={SocialSharingPage} />
-                  <Route path="/inventory/tracking" component={InventoryTrackingPage} />
-                  <Route path="/mobile-optimization-demo" component={MobileOptimizationDemo} />
-                  
-                  {/* Subscription Routes */}
-                  <Route path="/subscription" component={SubscriptionPage} />
-                  <Route path="/subscription/success" component={SubscriptionSuccessPage} />
-                  <Route path="/settings/subscription" component={SubscriptionManagementPage} />
-                  
-                  <Route component={NotFound} />
-                </Switch>
+                <AuthPage />
               </Suspense>
             </ErrorBoundary>
           </main>
-        </MainLayout>
+        ) : (
+          <MainLayout>
+            <main id="main-content" tabIndex={-1} className="outline-none">
+              <ErrorBoundary>
+                <Suspense fallback={<PageLoader />}>
+                  <Switch>
+                    {/* Public route for authentication */}
+                    <Route path="/auth" component={AuthPage} />
+                    
+                    {/* Protected routes that require authentication */}
+                    <ProtectedRoute path="/" component={Dashboard} />
+                    <ProtectedRoute path="/store" component={StoreView} />
+                    <ProtectedRoute path="/product-discovery" component={ProductDiscovery} />
+                    <ProtectedRoute path="/supplier-analysis" component={SupplierAnalysis} />
+                    <ProtectedRoute path="/advertising" component={Advertising} />
+                    <ProtectedRoute path="/orders" component={Orders} />
+                    <ProtectedRoute path="/automation" component={Automation} />
+                    <ProtectedRoute path="/competitor-tracking" component={CompetitorTrackingPage} />
+                    <ProtectedRoute path="/product-description-generator" component={ProductDescriptionGeneratorPage} />
+                    <ProtectedRoute path="/email-marketing" component={EmailMarketingPage} />
+                    <ProtectedRoute path="/social-sharing" component={SocialSharingPage} />
+                    <ProtectedRoute path="/inventory/tracking" component={InventoryTrackingPage} />
+                    <ProtectedRoute path="/mobile-optimization-demo" component={MobileOptimizationDemo} />
+                    
+                    {/* Subscription Routes */}
+                    <ProtectedRoute path="/subscription" component={SubscriptionPage} />
+                    <ProtectedRoute path="/subscription/success" component={SubscriptionSuccessPage} />
+                    <ProtectedRoute path="/settings/subscription" component={SubscriptionManagementPage} />
+                    
+                    <Route component={NotFound} />
+                  </Switch>
+                </Suspense>
+              </ErrorBoundary>
+            </main>
+          </MainLayout>
+        )}
         <Toaster />
       </ThemeProvider>
     </>
   );
 }
 
+// Auth provider component
+const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Check for user authentication on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const res = await fetch('/api/auth/me');
+        if (res.ok) {
+          const userData = await res.json();
+          setUser(userData);
+        }
+      } catch (error) {
+        console.error('Authentication error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    checkAuth();
+  }, []);
+  
+  return (
+    <AuthContext.Provider value={{ user, setUser, isLoading }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+
+// Protected route component
+const ProtectedRoute: React.FC<{
+  component: React.ComponentType;
+  path: string;
+}> = ({ component: Component, path }) => {
+  const { user, isLoading } = useContext(AuthContext);
+  
+  return (
+    <Route path={path}>
+      {isLoading ? (
+        <PageLoader />
+      ) : user ? (
+        <Component />
+      ) : (
+        <Redirect to="/auth" />
+      )}
+    </Route>
+  );
+};
+
+
+
 function App() {
   return (
     <ErrorBoundary>
       <AnnouncementProvider>
-        <AppContent />
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
       </AnnouncementProvider>
     </ErrorBoundary>
   );
