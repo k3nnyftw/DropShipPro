@@ -49,6 +49,18 @@ if (process.env.NODE_ENV === "production") {
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false }));
 
+// Configure session
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'dropship-automation-secret',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+  },
+  genid: () => uuidv4(),
+}));
+
 // Apply rate limiting in production
 if (process.env.NODE_ENV === "production") {
   // General API rate limiter
