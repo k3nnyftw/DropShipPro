@@ -95,6 +95,126 @@ export async function analyzeProductTrend(
 }
 
 /**
+ * Automatically discovers profitable products based on market trends and user preferences
+ * @param userPreferences User's business preferences and target markets
+ * @param limit Maximum number of products to discover
+ * @returns Promise resolving to an array of discovered products
+ */
+export async function discoverProfitableProducts(
+  userPreferences: any, 
+  limit: number = 20
+): Promise<any[]> {
+  // This would integrate with real APIs like Google Trends, Amazon Product API, etc.
+  // For now, we'll simulate intelligent product discovery
+  
+  const categories = userPreferences.interests || ['electronics', 'fashion', 'home'];
+  const targetMarkets = userPreferences.targetMarkets || ['US'];
+  const budget = parseFloat(userPreferences.monthlyBudget) || 500;
+  
+  const discoveredProducts = [];
+  
+  for (const category of categories) {
+    // Generate products based on current trends in each category
+    const categoryProducts = await generateTrendingProductsForCategory(category, targetMarkets, budget);
+    discoveredProducts.push(...categoryProducts);
+  }
+  
+  // Sort by profitability score and return top products
+  discoveredProducts.sort((a, b) => b.profitabilityScore - a.profitabilityScore);
+  
+  return discoveredProducts.slice(0, limit);
+}
+
+/**
+ * Generates trending products for a specific category
+ */
+async function generateTrendingProductsForCategory(
+  category: string, 
+  targetMarkets: string[], 
+  budget: number
+): Promise<any[]> {
+  const products = [];
+  
+  // Define trending products by category
+  const trendingProductsByCategory = {
+    electronics: [
+      { name: 'Wireless Earbuds Pro', keywords: ['wireless', 'bluetooth', 'earbuds'], avgPrice: 45 },
+      { name: 'Smart Watch Fitness Tracker', keywords: ['smartwatch', 'fitness', 'health'], avgPrice: 89 },
+      { name: 'Portable Phone Charger', keywords: ['powerbank', 'portable', 'charging'], avgPrice: 25 },
+      { name: 'LED Strip Lights', keywords: ['led', 'smart', 'lighting'], avgPrice: 35 },
+      { name: 'Phone Camera Lens Kit', keywords: ['camera', 'lens', 'photography'], avgPrice: 28 }
+    ],
+    fashion: [
+      { name: 'Oversized Hoodies', keywords: ['hoodie', 'oversized', 'streetwear'], avgPrice: 42 },
+      { name: 'Minimalist Jewelry Set', keywords: ['jewelry', 'minimalist', 'accessories'], avgPrice: 33 },
+      { name: 'Athletic Leggings', keywords: ['leggings', 'yoga', 'fitness'], avgPrice: 38 },
+      { name: 'Vintage Sunglasses', keywords: ['sunglasses', 'vintage', 'retro'], avgPrice: 22 },
+      { name: 'Crossbody Bag', keywords: ['bag', 'crossbody', 'fashion'], avgPrice: 48 }
+    ],
+    home: [
+      { name: 'Air Purifier Mini', keywords: ['air', 'purifier', 'health'], avgPrice: 67 },
+      { name: 'Kitchen Gadget Set', keywords: ['kitchen', 'gadgets', 'cooking'], avgPrice: 29 },
+      { name: 'Aromatherapy Diffuser', keywords: ['essential', 'oil', 'diffuser'], avgPrice: 34 },
+      { name: 'Smart Plant Pot', keywords: ['plant', 'smart', 'garden'], avgPrice: 52 },
+      { name: 'Memory Foam Pillow', keywords: ['pillow', 'memory', 'foam'], avgPrice: 31 }
+    ],
+    beauty: [
+      { name: 'Skincare Tool Set', keywords: ['skincare', 'beauty', 'tools'], avgPrice: 45 },
+      { name: 'Hair Styling Kit', keywords: ['hair', 'styling', 'beauty'], avgPrice: 38 },
+      { name: 'Makeup Brush Set', keywords: ['makeup', 'brushes', 'beauty'], avgPrice: 26 },
+      { name: 'LED Makeup Mirror', keywords: ['mirror', 'led', 'makeup'], avgPrice: 41 },
+      { name: 'Nail Art Kit', keywords: ['nail', 'art', 'beauty'], avgPrice: 23 }
+    ],
+    sports: [
+      { name: 'Resistance Bands Set', keywords: ['resistance', 'bands', 'fitness'], avgPrice: 19 },
+      { name: 'Yoga Mat Premium', keywords: ['yoga', 'mat', 'exercise'], avgPrice: 45 },
+      { name: 'Water Bottle Smart', keywords: ['water', 'bottle', 'smart'], avgPrice: 32 },
+      { name: 'Foam Roller Muscle', keywords: ['foam', 'roller', 'recovery'], avgPrice: 27 },
+      { name: 'Jump Rope Speed', keywords: ['jump', 'rope', 'cardio'], avgPrice: 15 }
+    ]
+  };
+  
+  const categoryProducts = trendingProductsByCategory[category] || [];
+  
+  for (const product of categoryProducts) {
+    // Calculate profitability based on various factors
+    const costPrice = product.avgPrice * 0.4; // 40% of selling price
+    const profitMargin = (product.avgPrice - costPrice) / product.avgPrice;
+    const demandScore = Math.random() * 40 + 60; // 60-100 demand score
+    const competitionLevel = Math.random() * 5 + 1; // 1-6 competition level
+    
+    // Calculate profitability score (0-100)
+    const profitabilityScore = Math.min(100, 
+      (profitMargin * 40) + 
+      (demandScore * 0.4) + 
+      ((6 - competitionLevel) * 5)
+    );
+    
+    // Only include products that meet minimum profitability threshold
+    if (profitabilityScore >= 70) {
+      products.push({
+        name: product.name,
+        category: category,
+        estimatedPrice: product.avgPrice,
+        costPrice: costPrice,
+        profitMargin: Math.round(profitMargin * 100),
+        demandScore: Math.round(demandScore),
+        competitionLevel: Math.round(competitionLevel),
+        profitabilityScore: Math.round(profitabilityScore),
+        keywords: product.keywords,
+        targetMarkets: targetMarkets,
+        estimatedMonthlySales: Math.round(20 + Math.random() * 80),
+        trendingScore: Math.round(Math.random() * 30 + 70),
+        seasonality: Math.random() > 0.7 ? 'seasonal' : 'year-round',
+        suggestedMarkup: Math.round(((product.avgPrice - costPrice) / costPrice) * 100)
+      });
+    }
+  }
+  
+  return products;
+}
+
+/**
  * Retrieves market insights for a specific product category
  * @param category The product category to analyze
  * @returns Promise resolving to market insights for the category

@@ -13,13 +13,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import TrendingProducts from "@/components/product-discovery/trending-products";
 import MarketTrend from "@/components/product-discovery/market-trend";
 import { AIRecommendations } from "@/components/product-discovery/ai-recommendations";
-import { Search, Sparkles, TrendingUp, BarChart3 } from "lucide-react";
+import { AutoDiscovery } from "@/components/product-discovery/auto-discovery";
+import { Search, Sparkles, TrendingUp, BarChart3, Bot } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 
 const ProductDiscovery: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>("ai");
+  const [activeTab, setActiveTab] = useState<string>("auto");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -157,6 +158,10 @@ const ProductDiscovery: React.FC = () => {
       {/* Main Content Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="mb-6">
+          <TabsTrigger value="auto" className="gap-2">
+            <Bot className="h-4 w-4" />
+            Auto Discovery
+          </TabsTrigger>
           <TabsTrigger value="ai" className="gap-2">
             <Sparkles className="h-4 w-4" />
             AI Recommendations
@@ -170,6 +175,10 @@ const ProductDiscovery: React.FC = () => {
             Market Analysis
           </TabsTrigger>
         </TabsList>
+
+        <TabsContent value="auto" className="mt-0">
+          <AutoDiscovery />
+        </TabsContent>
 
         <TabsContent value="ai" className="mt-0">
           <AIRecommendations onAddToStore={handleAddToStore} />

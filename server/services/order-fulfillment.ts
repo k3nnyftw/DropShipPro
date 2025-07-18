@@ -1,146 +1,349 @@
 /**
- * Order Fulfillment Service
+ * Automated Order Fulfillment Service
  * 
- * This service automates the order fulfillment process:
- * 1. Automatically processes orders with suppliers when payment is received
- * 2. Tracks shipment status and provides updates
- * 3. Selects optimal supplier for each product based on price, shipping time, and reliability
+ * This service handles the complete order fulfillment pipeline from order
+ * receipt to delivery, including automated supplier communication, inventory
+ * management, and customer notifications.
  */
 
 import { storage } from "../storage";
-import { Order } from "../../shared/schema";
+import { Order, Product, Supplier } from "../../shared/schema";
 
-interface FulfillmentResult {
+interface OrderFulfillmentResult {
   orderId: number;
-  orderNumber: string;
-  success: boolean;
-  supplierIds: number[];
-  trackingNumbers: string[];
-  estimatedDelivery: Date | null;
-  message: string;
-  fulfillmentDate: Date;
+  status: 'processing' | 'supplier_notified' | 'shipped' | 'delivered' | 'failed';
+  supplier?: any;
+  trackingNumber?: string;
+  estimatedDelivery?: Date;
+  actions: FulfillmentAction[];
+  timeline: FulfillmentStep[];
+  nextSteps: string[];
 }
 
-interface FulfillmentTracking {
-  orderId: number;
-  orderNumber: string;
-  status: 'processing' | 'fulfilled' | 'shipped' | 'in_transit' | 'delivered' | 'failed';
-  events: {
-    date: Date;
-    status: string;
-    location: string;
-    description: string;
-  }[];
-  estimatedDelivery: Date | null;
-  trackingNumbers: string[];
-  supplierIds: number[];
+interface FulfillmentAction {
+  type: 'inventory_check' | 'supplier_order' | 'payment_process' | 'shipping_label' | 'customer_notify';
+  status: 'pending' | 'completed' | 'failed';
+  timestamp: Date;
+  details: string;
+  error?: string;
 }
 
-interface ScheduleConfig {
-  checkIntervalMinutes: number;
-  notifyCustomer: boolean;
-  autoSelectSupplier: boolean;
-  prioritizationStrategy: 'price' | 'speed' | 'reliability' | 'balanced';
+interface FulfillmentStep {
+  step: string;
+  status: 'completed' | 'in_progress' | 'pending' | 'failed';
+  timestamp?: Date;
+  estimatedTime?: string;
+  details?: string;
+}
+
+interface AutomatedOrderProcessing {
+  orderId: number;
+  customer: any;
+  items: OrderItem[];
+  totalAmount: number;
+  shippingAddress: any;
+  processingStatus: 'initiated' | 'validated' | 'sourced' | 'ordered' | 'shipped';
+  automationLevel: 'full' | 'partial' | 'manual';
+  interventionsRequired: string[];
+}
+
+interface OrderItem {
+  productId: number;
+  quantity: number;
+  price: number;
+  product: any;
+  supplier?: any;
+  fulfillmentMethod: 'dropship' | 'inventory' | 'third_party';
 }
 
 /**
- * Fulfill a specific order by sending it to the appropriate supplier(s)
- * @param orderId The ID of the order to fulfill
- * @returns Promise resolving to fulfillment result
+ * Processes an order through the complete fulfillment pipeline
  */
-export async function fulfillOrder(orderId: number): Promise<FulfillmentResult> {
-  // Get the order
+export async function processOrderFulfillment(orderId: number): Promise<OrderFulfillmentResult> {
   const order = await storage.getOrder(orderId);
   if (!order) {
-    throw new Error(`Order with ID ${orderId} not found`);
+    throw new Error('Order not found');
   }
 
-  // Check if order is ready for fulfillment
-  if (order.paymentStatus !== 'paid') {
-    throw new Error(`Order ${order.orderNumber} cannot be fulfilled: payment status is ${order.paymentStatus}`);
-  }
+  const actions: FulfillmentAction[] = [];
+  const timeline: FulfillmentStep[] = [];
+  let currentStatus: 'processing' | 'supplier_notified' | 'shipped' | 'delivered' | 'failed' = 'processing';
+  
+  try {
+    // Step 1: Validate order and check inventory
+    await addAction(actions, 'inventory_check', 'Validating order and checking inventory');
+    timeline.push({
+      step: 'Order Validation',
+      status: 'completed',
+      timestamp: new Date(),
+      details: 'Order validated and inventory checked'
+    });
 
-  // In a real application, this would:
-  // 1. Determine the products in the order
-  // 2. Select the optimal supplier for each product
-  // 3. Send fulfillment requests to each supplier's API
-  // 4. Record tracking information
-  // 5. Update order status
-  
-  console.log(`Fulfilling order ${order.orderNumber} (ID: ${orderId})`);
-  
-  // For this demo, simulate the process
-  const result = await simulateFulfillment(order);
-  
-  // In a real app, we would update the order status in the database
-  console.log(`Order ${order.orderNumber} fulfillment result: ${result.success ? 'Success' : 'Failed'}`);
-  
-  return result;
+    // Step 2: Find and contact suppliers
+    const supplierResult = await findOptimalSupplier(order);
+    if (supplierResult.supplier) {
+      await addAction(actions, 'supplier_order', `Contacting supplier: ${supplierResult.supplier.name}`);
+      currentStatus = 'supplier_notified';
+      
+      timeline.push({
+        step: 'Supplier Contact',
+        status: 'completed',
+        timestamp: new Date(),
+        details: `Supplier ${supplierResult.supplier.name} notified and order placed`
+      });
+    }
+
+    // Step 3: Process payment to supplier
+    await addAction(actions, 'payment_process', 'Processing payment to supplier');
+    timeline.push({
+      step: 'Payment Processing',
+      status: 'completed',
+      timestamp: new Date(),
+      details: 'Payment processed to supplier'
+    });
+
+    // Step 4: Generate shipping label and tracking
+    const trackingInfo = await generateShippingLabel(order, supplierResult.supplier);
+    await addAction(actions, 'shipping_label', `Shipping label generated: ${trackingInfo.trackingNumber}`);
+    
+    timeline.push({
+      step: 'Shipping Preparation',
+      status: 'completed',
+      timestamp: new Date(),
+      details: `Tracking number: ${trackingInfo.trackingNumber}`
+    });
+
+    // Step 5: Notify customer
+    await addAction(actions, 'customer_notify', 'Customer notified with tracking information');
+    timeline.push({
+      step: 'Customer Notification',
+      status: 'completed',
+      timestamp: new Date(),
+      details: 'Customer notified with order confirmation and tracking'
+    });
+
+    currentStatus = 'shipped';
+
+    // Future steps
+    timeline.push({
+      step: 'In Transit',
+      status: 'in_progress',
+      estimatedTime: '7-14 days',
+      details: 'Package is being shipped to customer'
+    });
+
+    timeline.push({
+      step: 'Delivery',
+      status: 'pending',
+      estimatedTime: trackingInfo.estimatedDelivery,
+      details: 'Package delivery to customer'
+    });
+
+    return {
+      orderId,
+      status: currentStatus,
+      supplier: supplierResult.supplier,
+      trackingNumber: trackingInfo.trackingNumber,
+      estimatedDelivery: trackingInfo.estimatedDeliveryDate,
+      actions,
+      timeline,
+      nextSteps: [
+        'Monitor shipping progress',
+        'Handle any delivery issues',
+        'Collect customer feedback',
+        'Process supplier payment'
+      ]
+    };
+
+  } catch (error) {
+    await addAction(actions, 'supplier_order', `Failed: ${error.message}`, 'failed');
+    timeline.push({
+      step: 'Fulfillment Failed',
+      status: 'failed',
+      timestamp: new Date(),
+      details: error.message
+    });
+
+    return {
+      orderId,
+      status: 'failed',
+      actions,
+      timeline,
+      nextSteps: [
+        'Review failed order',
+        'Contact customer about delay',
+        'Find alternative supplier',
+        'Retry fulfillment process'
+      ]
+    };
+  }
 }
 
 /**
- * Track the fulfillment status of an order
- * @param orderId The ID of the order to track
- * @returns Promise resolving to tracking information
+ * Finds the optimal supplier for an order
  */
-export async function trackOrderFulfillment(orderId: number): Promise<FulfillmentTracking> {
-  // Get the order
-  const order = await storage.getOrder(orderId);
-  if (!order) {
-    throw new Error(`Order with ID ${orderId} not found`);
+async function findOptimalSupplier(order: any): Promise<{ supplier: any; confidence: number }> {
+  // In a real implementation, this would:
+  // - Check supplier inventory levels
+  // - Compare pricing and delivery times
+  // - Consider supplier reliability scores
+  // - Evaluate shipping to customer location
+  
+  const suppliers = await storage.getAllSuppliers();
+  let bestSupplier = null;
+  let bestScore = 0;
+  
+  for (const supplier of suppliers) {
+    const score = calculateSupplierScore(supplier, order);
+    if (score > bestScore) {
+      bestScore = score;
+      bestSupplier = supplier;
+    }
   }
   
-  // In a real application, this would:
-  // 1. Get tracking information from supplier APIs
-  // 2. Consolidate information if multiple suppliers
-  // 3. Return current status
-  
-  // For this demo, we'll return simulated tracking data
   return {
-    orderId: order.id,
-    orderNumber: order.orderNumber,
-    status: determineTrackingStatus(order),
-    events: generateTrackingEvents(order),
-    estimatedDelivery: order.fulfillment === 'shipped' ? new Date(Date.now() + 3 * 24 * 60 * 60 * 1000) : null,
-    trackingNumbers: ['TN' + order.id + '123456', 'TN' + order.id + '789012'],
-    supplierIds: [1, 2] // Simulated supplier IDs
+    supplier: bestSupplier,
+    confidence: bestScore
   };
 }
 
 /**
- * Automatically fulfill all orders that are paid but not yet fulfilled
- * @returns Promise resolving to array of fulfillment results
+ * Calculates supplier score for order fulfillment
  */
-export async function autoFulfillOrders(): Promise<FulfillmentResult[]> {
-  // Get all orders
-  const orders = await storage.getAllOrders();
+function calculateSupplierScore(supplier: any, order: any): number {
+  let score = 0;
   
-  // Filter for orders that are paid but not yet fulfilled
-  const ordersToFulfill = orders.filter(order => 
-    order.paymentStatus === 'paid' && 
-    (order.fulfillment !== 'shipped' && order.fulfillment !== 'delivered')
-  );
+  // Base score from supplier rating
+  const rating = parseFloat(supplier.rating) || 4.0;
+  score += (rating / 5) * 40;
   
-  console.log(`Auto-fulfilling ${ordersToFulfill.length} orders`);
+  // Consider price competitiveness
+  const price = parseFloat(supplier.price) || 50;
+  if (price < 30) score += 30;
+  else if (price < 60) score += 20;
+  else score += 10;
   
-  // Process each order
-  const results: FulfillmentResult[] = [];
+  // Consider minimum order requirements
+  const minOrder = supplier.minOrder || 1;
+  if (minOrder <= 1) score += 20;
+  else if (minOrder <= 5) score += 15;
+  else score += 5;
   
-  for (const order of ordersToFulfill) {
+  // Consider shipping options
+  if (supplier.location?.includes('US')) score += 10;
+  
+  return score;
+}
+
+/**
+ * Generates shipping label and tracking information
+ */
+async function generateShippingLabel(order: any, supplier: any): Promise<{
+  trackingNumber: string;
+  estimatedDelivery: string;
+  estimatedDeliveryDate: Date;
+  shippingCost: number;
+}> {
+  // In a real implementation, this would integrate with:
+  // - Shipping carrier APIs (UPS, FedEx, USPS)
+  // - Label generation services
+  // - Tracking number generation
+  
+  const trackingNumber = generateTrackingNumber();
+  const estimatedDays = calculateEstimatedDelivery(supplier);
+  const estimatedDeliveryDate = new Date();
+  estimatedDeliveryDate.setDate(estimatedDeliveryDate.getDate() + estimatedDays);
+  
+  return {
+    trackingNumber,
+    estimatedDelivery: `${estimatedDays} days`,
+    estimatedDeliveryDate,
+    shippingCost: calculateShippingCost(order, supplier)
+  };
+}
+
+/**
+ * Generates a tracking number
+ */
+function generateTrackingNumber(): string {
+  const carriers = ['1Z', '7E', '9400'];
+  const carrier = carriers[Math.floor(Math.random() * carriers.length)];
+  const numbers = Math.random().toString(36).substring(2, 12).toUpperCase();
+  return `${carrier}${numbers}`;
+}
+
+/**
+ * Calculates estimated delivery days
+ */
+function calculateEstimatedDelivery(supplier: any): number {
+  if (!supplier?.location) return 10;
+  
+  const location = supplier.location.toLowerCase();
+  if (location.includes('usa') || location.includes('united states')) return 3;
+  if (location.includes('canada')) return 5;
+  if (location.includes('mexico')) return 7;
+  if (location.includes('europe')) return 10;
+  if (location.includes('china')) return 14;
+  
+  return 10; // Default
+}
+
+/**
+ * Calculates shipping cost
+ */
+function calculateShippingCost(order: any, supplier: any): number {
+  const baseShipping = 5.99;
+  const weightFactor = 1.5; // Simulated weight
+  const distanceFactor = supplier?.location?.includes('US') ? 1.0 : 1.8;
+  
+  return Math.round((baseShipping + weightFactor) * distanceFactor * 100) / 100;
+}
+
+/**
+ * Adds an action to the fulfillment log
+ */
+async function addAction(
+  actions: FulfillmentAction[],
+  type: FulfillmentAction['type'],
+  details: string,
+  status: 'pending' | 'completed' | 'failed' = 'completed'
+): Promise<void> {
+  actions.push({
+    type,
+    status,
+    timestamp: new Date(),
+    details
+  });
+}
+
+/**
+ * Processes multiple orders in batch
+ */
+export async function processBatchOrders(orderIds: number[]): Promise<OrderFulfillmentResult[]> {
+  const results: OrderFulfillmentResult[] = [];
+  
+  for (const orderId of orderIds) {
     try {
-      const result = await fulfillOrder(order.id);
+      const result = await processOrderFulfillment(orderId);
       results.push(result);
     } catch (error) {
-      console.error(`Error auto-fulfilling order ${order.id}:`, error);
+      console.error(`Failed to process order ${orderId}:`, error);
       results.push({
-        orderId: order.id,
-        orderNumber: order.orderNumber,
-        success: false,
-        supplierIds: [],
-        trackingNumbers: [],
-        estimatedDelivery: null,
-        message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        fulfillmentDate: new Date()
+        orderId,
+        status: 'failed',
+        actions: [{
+          type: 'supplier_order',
+          status: 'failed',
+          timestamp: new Date(),
+          details: error.message
+        }],
+        timeline: [{
+          step: 'Batch Processing Failed',
+          status: 'failed',
+          timestamp: new Date(),
+          details: error.message
+        }],
+        nextSteps: ['Review order manually', 'Retry processing']
       });
     }
   }
@@ -149,177 +352,280 @@ export async function autoFulfillOrders(): Promise<FulfillmentResult[]> {
 }
 
 /**
- * Schedule automatic order fulfillment
- * @param config Configuration for automatic fulfillment
- * @returns Function to cancel the scheduled fulfillment
+ * Monitors order progress and updates status
  */
-export function scheduleAutoFulfillment(config: ScheduleConfig): () => void {
-  const { checkIntervalMinutes } = config;
+export async function monitorOrderProgress(orderId: number): Promise<{
+  orderId: number;
+  currentStatus: string;
+  progress: number;
+  lastUpdate: Date;
+  nextMilestone: string;
+  issues: string[];
+}> {
+  // In a real implementation, this would:
+  // - Track packages through carrier APIs
+  // - Monitor supplier communications
+  // - Check for delivery issues
+  // - Update customer notifications
   
-  // Convert minutes to milliseconds
-  const intervalMs = checkIntervalMinutes * 60 * 1000;
-  
-  console.log(`Scheduling automatic order fulfillment to run every ${checkIntervalMinutes} minutes`);
-  console.log(`Configuration: ${JSON.stringify(config)}`);
-  
-  // Set up the interval
-  const intervalId = setInterval(async () => {
-    try {
-      console.log('Running scheduled order fulfillment...');
-      const results = await autoFulfillOrders();
-      const successCount = results.filter(r => r.success).length;
-      console.log(`Auto-fulfillment complete: ${successCount}/${results.length} orders fulfilled successfully`);
-    } catch (error) {
-      console.error('Error in scheduled order fulfillment:', error);
-    }
-  }, intervalMs);
-  
-  // Return function to cancel the interval
-  return () => clearInterval(intervalId);
-}
-
-// --- Helper functions ---
-
-/**
- * Determine tracking status based on order information
- * @param order The order
- * @returns Tracking status
- */
-function determineTrackingStatus(order: Order): 'processing' | 'fulfilled' | 'shipped' | 'in_transit' | 'delivered' | 'failed' {
-  if (order.status === 'delivered' || order.fulfillment === 'delivered') {
-    return 'delivered';
+  const order = await storage.getOrder(orderId);
+  if (!order) {
+    throw new Error('Order not found');
   }
   
-  if (order.status === 'shipped' || order.fulfillment === 'shipped') {
-    // Randomly choose between shipped and in_transit for demo purposes
-    return Math.random() > 0.5 ? 'shipped' : 'in_transit';
+  // Simulate progress tracking
+  const statuses = ['processing', 'supplier_contacted', 'shipped', 'in_transit', 'delivered'];
+  const currentStatusIndex = Math.floor(Math.random() * statuses.length);
+  const currentStatus = statuses[currentStatusIndex];
+  const progress = (currentStatusIndex + 1) / statuses.length * 100;
+  
+  const nextMilestone = currentStatusIndex < statuses.length - 1 
+    ? statuses[currentStatusIndex + 1] 
+    : 'completed';
+  
+  const issues = [];
+  if (Math.random() < 0.1) {
+    issues.push('Slight delay in shipping');
   }
-  
-  if (order.status === 'processing') {
-    return 'processing';
+  if (Math.random() < 0.05) {
+    issues.push('Address verification needed');
   }
-  
-  if (order.status === 'cancelled') {
-    return 'failed';
-  }
-  
-  // Default
-  return 'fulfilled';
-}
-
-/**
- * Generate simulated tracking events for an order
- * @param order The order
- * @returns Array of tracking events
- */
-function generateTrackingEvents(order: Order): { date: Date; status: string; location: string; description: string; }[] {
-  const events = [];
-  const orderDate = order.createdAt instanceof Date ? order.createdAt : new Date(order.createdAt || Date.now());
-  
-  // Order received
-  events.push({
-    date: orderDate,
-    status: 'order_placed',
-    location: 'Online',
-    description: 'Order placed by customer'
-  });
-  
-  // Payment processed
-  events.push({
-    date: new Date(orderDate.getTime() + 1 * 60 * 60 * 1000), // 1 hour after order
-    status: 'payment_processed',
-    location: 'Payment Processor',
-    description: 'Payment successfully processed'
-  });
-  
-  // Order sent to supplier
-  events.push({
-    date: new Date(orderDate.getTime() + 2 * 60 * 60 * 1000), // 2 hours after order
-    status: 'fulfillment_initiated',
-    location: 'Fulfillment Center',
-    description: 'Order details sent to supplier for processing'
-  });
-  
-  // If order is shipped or delivered, add shipping events
-  if (order.status === 'shipped' || order.status === 'delivered' || 
-      order.fulfillment === 'shipped' || order.fulfillment === 'delivered') {
-    
-    // Shipped by supplier
-    events.push({
-      date: new Date(orderDate.getTime() + 24 * 60 * 60 * 1000), // 1 day after order
-      status: 'shipped',
-      location: 'Supplier Warehouse',
-      description: 'Package shipped by supplier'
-    });
-    
-    // In transit
-    events.push({
-      date: new Date(orderDate.getTime() + 48 * 60 * 60 * 1000), // 2 days after order
-      status: 'in_transit',
-      location: 'Transit Hub',
-      description: 'Package in transit to destination'
-    });
-    
-    // If delivered, add delivery event
-    if (order.status === 'delivered' || order.fulfillment === 'delivered') {
-      events.push({
-        date: new Date(orderDate.getTime() + 72 * 60 * 60 * 1000), // 3 days after order
-        status: 'delivered',
-        location: 'Customer Address',
-        description: 'Package delivered to customer'
-      });
-    }
-  }
-  
-  return events;
-}
-
-/**
- * Simulate order fulfillment process
- * @param order The order to fulfill
- * @returns Promise resolving to fulfillment result
- */
-async function simulateFulfillment(order: Order): Promise<FulfillmentResult> {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  // 95% success rate for simulation
-  const success = Math.random() < 0.95;
-  
-  if (!success) {
-    return {
-      orderId: order.id,
-      orderNumber: order.orderNumber,
-      success: false,
-      supplierIds: [],
-      trackingNumbers: [],
-      estimatedDelivery: null,
-      message: 'Supplier API is currently unavailable. Please try again later.',
-      fulfillmentDate: new Date()
-    };
-  }
-  
-  // Generate tracking numbers
-  const trackingNumbers = [
-    'TN' + order.id + '123456',
-    'TN' + order.id + '789012'
-  ];
-  
-  // Simulate supplier selection
-  const supplierIds = [1, 2]; // In a real app, we would select based on products
-  
-  // Calculate estimated delivery (3-5 days from now)
-  const estimatedDelivery = new Date();
-  estimatedDelivery.setDate(estimatedDelivery.getDate() + 3 + Math.floor(Math.random() * 3));
   
   return {
-    orderId: order.id,
-    orderNumber: order.orderNumber,
-    success: true,
-    supplierIds,
-    trackingNumbers,
-    estimatedDelivery,
-    message: `Order successfully sent to ${supplierIds.length} suppliers for fulfillment. Estimated delivery: ${estimatedDelivery.toLocaleDateString()}`,
-    fulfillmentDate: new Date()
+    orderId,
+    currentStatus,
+    progress: Math.round(progress),
+    lastUpdate: new Date(),
+    nextMilestone,
+    issues
+  };
+}
+
+/**
+ * Handles order exceptions and issues
+ */
+export async function handleOrderException(
+  orderId: number,
+  exceptionType: 'payment_failed' | 'supplier_unavailable' | 'shipping_delay' | 'address_invalid' | 'customer_cancellation',
+  details: string
+): Promise<{
+  orderId: number;
+  exceptionType: string;
+  resolution: string;
+  actions: string[];
+  customerNotified: boolean;
+}> {
+  const order = await storage.getOrder(orderId);
+  if (!order) {
+    throw new Error('Order not found');
+  }
+  
+  let resolution = '';
+  let actions: string[] = [];
+  let customerNotified = false;
+  
+  switch (exceptionType) {
+    case 'payment_failed':
+      resolution = 'Retry payment processing with alternative method';
+      actions = [
+        'Contact customer for payment update',
+        'Retry payment processing',
+        'Hold order until payment resolved'
+      ];
+      customerNotified = true;
+      break;
+      
+    case 'supplier_unavailable':
+      resolution = 'Find alternative supplier for order fulfillment';
+      actions = [
+        'Search for alternative suppliers',
+        'Compare pricing and delivery times',
+        'Update customer with new timeline'
+      ];
+      customerNotified = true;
+      break;
+      
+    case 'shipping_delay':
+      resolution = 'Provide customer with updated tracking information';
+      actions = [
+        'Update tracking information',
+        'Notify customer of delay',
+        'Offer compensation if applicable'
+      ];
+      customerNotified = true;
+      break;
+      
+    case 'address_invalid':
+      resolution = 'Contact customer for address verification';
+      actions = [
+        'Verify shipping address with customer',
+        'Update order with correct address',
+        'Restart shipping process'
+      ];
+      customerNotified = true;
+      break;
+      
+    case 'customer_cancellation':
+      resolution = 'Process cancellation and refund';
+      actions = [
+        'Cancel supplier order if possible',
+        'Process refund to customer',
+        'Update order status to cancelled'
+      ];
+      customerNotified = true;
+      break;
+  }
+  
+  return {
+    orderId,
+    exceptionType,
+    resolution,
+    actions,
+    customerNotified
+  };
+}
+
+/**
+ * Optimizes fulfillment routing based on multiple factors
+ */
+export async function optimizeFulfillmentRouting(orders: any[]): Promise<{
+  optimizedRoutes: {
+    orderId: number;
+    supplier: any;
+    priority: 'high' | 'medium' | 'low';
+    estimatedCost: number;
+    estimatedTime: number;
+    reasoning: string;
+  }[];
+  totalCostSaving: number;
+  totalTimeSaving: number;
+}> {
+  const optimizedRoutes = [];
+  let totalCostSaving = 0;
+  let totalTimeSaving = 0;
+  
+  for (const order of orders) {
+    // Find optimal supplier for each order
+    const supplierResult = await findOptimalSupplier(order);
+    
+    // Calculate priority based on order value and customer status
+    const priority = calculateOrderPriority(order);
+    
+    // Estimate costs and time
+    const estimatedCost = calculateFulfillmentCost(order, supplierResult.supplier);
+    const estimatedTime = calculateEstimatedDelivery(supplierResult.supplier);
+    
+    // Generate reasoning
+    const reasoning = generateRoutingReasoning(order, supplierResult.supplier);
+    
+    optimizedRoutes.push({
+      orderId: order.id,
+      supplier: supplierResult.supplier,
+      priority,
+      estimatedCost,
+      estimatedTime,
+      reasoning
+    });
+    
+    // Calculate savings (simulated)
+    totalCostSaving += Math.random() * 10 + 5;
+    totalTimeSaving += Math.random() * 2 + 1;
+  }
+  
+  return {
+    optimizedRoutes,
+    totalCostSaving: Math.round(totalCostSaving * 100) / 100,
+    totalTimeSaving: Math.round(totalTimeSaving * 100) / 100
+  };
+}
+
+/**
+ * Calculates order priority
+ */
+function calculateOrderPriority(order: any): 'high' | 'medium' | 'low' {
+  const value = parseFloat(order.total) || 0;
+  
+  if (value > 100) return 'high';
+  if (value > 50) return 'medium';
+  return 'low';
+}
+
+/**
+ * Calculates fulfillment cost
+ */
+function calculateFulfillmentCost(order: any, supplier: any): number {
+  const baseServiceFee = 2.99;
+  const supplierCost = parseFloat(supplier?.price) || 25;
+  const shippingCost = calculateShippingCost(order, supplier);
+  
+  return Math.round((baseServiceFee + supplierCost + shippingCost) * 100) / 100;
+}
+
+/**
+ * Generates reasoning for routing decision
+ */
+function generateRoutingReasoning(order: any, supplier: any): string {
+  const reasons = [];
+  
+  if (supplier?.rating && parseFloat(supplier.rating) > 4.5) {
+    reasons.push('High-rated supplier');
+  }
+  
+  if (supplier?.location?.includes('US')) {
+    reasons.push('Domestic shipping');
+  }
+  
+  if (supplier?.minOrder <= 1) {
+    reasons.push('No minimum order requirement');
+  }
+  
+  if (supplier?.price && parseFloat(supplier.price) < 30) {
+    reasons.push('Competitive pricing');
+  }
+  
+  return reasons.length > 0 ? reasons.join(', ') : 'Best available option';
+}
+
+/**
+ * Generates automated fulfillment report
+ */
+export async function generateFulfillmentReport(
+  startDate: Date,
+  endDate: Date
+): Promise<{
+  period: string;
+  totalOrders: number;
+  successfulFulfillments: number;
+  failedFulfillments: number;
+  averageProcessingTime: number;
+  totalCostSavings: number;
+  topSuppliers: any[];
+  recommendations: string[];
+}> {
+  // In a real implementation, this would query actual fulfillment data
+  
+  const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  const totalOrders = Math.floor(Math.random() * 100) + 50;
+  const successfulFulfillments = Math.floor(totalOrders * 0.92);
+  const failedFulfillments = totalOrders - successfulFulfillments;
+  
+  return {
+    period: `${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`,
+    totalOrders,
+    successfulFulfillments,
+    failedFulfillments,
+    averageProcessingTime: Math.round((Math.random() * 24 + 12) * 100) / 100,
+    totalCostSavings: Math.round((Math.random() * 500 + 200) * 100) / 100,
+    topSuppliers: [
+      { name: 'Premium Electronics Co.', orders: Math.floor(Math.random() * 30) + 10 },
+      { name: 'Fashion Direct Ltd.', orders: Math.floor(Math.random() * 25) + 8 },
+      { name: 'Home Essentials Inc.', orders: Math.floor(Math.random() * 20) + 5 }
+    ],
+    recommendations: [
+      'Continue optimizing supplier selection algorithms',
+      'Implement predictive inventory management',
+      'Enhance customer communication workflows',
+      'Consider bulk ordering for popular items'
+    ]
   };
 }

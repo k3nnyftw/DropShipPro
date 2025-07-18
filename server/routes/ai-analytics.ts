@@ -73,6 +73,31 @@ router.get('/product-trend', async (req: Request, res: Response) => {
 });
 
 /**
+ * POST /api/ai-analytics/discover-products
+ * Automatically discovers profitable products based on user preferences
+ */
+router.post('/discover-products', async (req: Request, res: Response) => {
+  try {
+    const userPreferences = req.body;
+    const limit = req.query.limit ? parseInt(req.query.limit as string) : 20;
+    
+    const discoveredProducts = await aiAnalyticsService.discoverProfitableProducts(userPreferences, limit);
+    
+    res.json({
+      success: true,
+      count: discoveredProducts.length,
+      products: discoveredProducts
+    });
+  } catch (error) {
+    console.error('Error discovering products:', error);
+    res.status(500).json({ 
+      error: 'Failed to discover products',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+/**
  * GET /api/ai-analytics/sales-projections/:productId
  * Returns sales projections for a product
  */
