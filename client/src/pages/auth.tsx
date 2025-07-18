@@ -86,7 +86,8 @@ export default function AuthPage() {
         title: "Login successful",
         description: `Welcome back, ${userData.username}!`,
       });
-      navigate("/");
+      // Force a page refresh to ensure proper authentication state
+      window.location.href = "/";
     } catch (error) {
       toast({
         title: "Login failed",
@@ -125,7 +126,8 @@ export default function AuthPage() {
         title: "Registration successful",
         description: "Your account has been created and you're now logged in.",
       });
-      navigate("/");
+      // Force a page refresh to ensure proper authentication state
+      window.location.href = "/";
     } catch (error) {
       toast({
         title: "Registration failed",

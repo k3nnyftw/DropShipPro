@@ -103,6 +103,8 @@ router.post('/login', async (req, res) => {
         console.error('Session save error:', err);
         return res.status(500).json({ message: 'Failed to create session' });
       }
+      console.log('Login successful - Session ID:', req.sessionID);
+      console.log('Login successful - User ID saved to session:', req.session.userId);
       res.json(userWithoutPassword);
     });
   } catch (error) {
@@ -116,18 +118,26 @@ router.get('/me', async (req, res) => {
   try {
     const userId = req.session.userId;
     
+    console.log('Auth check - Session ID:', req.sessionID);
+    console.log('Auth check - User ID from session:', userId);
+    console.log('Auth check - Session data:', req.session);
+    
     if (!userId) {
+      console.log('No user ID in session');
       return res.status(401).json({ message: 'Not authenticated' });
     }
     
     const user = await storage.getUser(userId);
     if (!user) {
+      console.log('User not found in storage for ID:', userId);
       // Clear invalid session
       req.session.destroy((err: Error) => {
         if (err) console.error('Session destruction error:', err);
       });
       return res.status(401).json({ message: 'User not found' });
     }
+    
+    console.log('User found:', user.username);
     
     // Remove password from response
     const { password, ...userWithoutPassword } = user;
