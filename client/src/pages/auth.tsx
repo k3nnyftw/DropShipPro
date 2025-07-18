@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useContext, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -9,7 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
-import { useContext } from "react";
 import { AuthContext } from "../App";
 import { useLocation } from "wouter";
 
@@ -37,10 +36,11 @@ export default function AuthPage() {
   const [, navigate] = useLocation();
   
   // Redirect to dashboard if user is already authenticated
-  if (user) {
-    navigate("/");
-    return null;
-  }
+  useEffect(() => {
+    if (user) {
+      navigate("/");
+    }
+  }, [user, navigate]);
 
   // Login form
   const loginForm = useForm<z.infer<typeof loginSchema>>({
@@ -72,6 +72,7 @@ export default function AuthPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(values),
+        credentials: "include", // Include cookies in the request
       });
 
       if (!response.ok) {
@@ -110,6 +111,7 @@ export default function AuthPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(registrationData),
+        credentials: "include", // Include cookies in the request
       });
 
       if (!response.ok) {
