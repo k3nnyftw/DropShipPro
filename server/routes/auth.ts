@@ -4,7 +4,6 @@ import bcrypt from 'bcrypt';
 import { storage } from '../storage';
 import { insertUserSchema } from '../../shared/schema';
 import { SubscriptionPlan, SubscriptionStatus } from '../../shared/subscription';
-import session from 'express-session';
 
 // Add session types to Express.Request
 declare module 'express-session' {
@@ -14,17 +13,6 @@ declare module 'express-session' {
 }
 
 const router = express.Router();
-
-// Initialize session middleware
-router.use(session({
-  secret: process.env.SESSION_SECRET || 'dropship-automation-secret',
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
-  }
-}));
 
 // User registration
 router.post('/register', async (req, res) => {
@@ -61,7 +49,14 @@ router.post('/register', async (req, res) => {
     // Create session
     req.session.userId = user.id;
     
-    res.status(201).json(userWithoutPassword);
+    // Save session explicitly
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).json({ message: 'Failed to create session' });
+      }
+      res.status(201).json(userWithoutPassword);
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ 
@@ -102,7 +97,14 @@ router.post('/login', async (req, res) => {
     // Remove password from response
     const { password: _, ...userWithoutPassword } = user;
     
-    res.json(userWithoutPassword);
+    // Save session explicitly
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).json({ message: 'Failed to create session' });
+      }
+      res.json(userWithoutPassword);
+    });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ message: 'Failed to log in' });
