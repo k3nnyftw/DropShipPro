@@ -55,6 +55,9 @@ const SubscriptionPage = lazyImportDefault(() => import("@/pages/subscription"))
 const SubscriptionSuccessPage = lazyImportDefault(() => import("@/pages/subscription/success"));
 const SubscriptionManagementPage = lazyImportDefault(() => import("@/pages/settings/subscription"));
 
+// Profile setup
+const ProfileSetupPage = lazyImportDefault(() => import("@/pages/profile-setup"));
+
 // Examples and demos
 const MobileOptimizationDemo = lazyImportDefault(() => import("@/components/examples/mobile-optimization-demo"));
 
@@ -162,6 +165,9 @@ function AppContent() {
                     <ProtectedRoute path="/subscription/success" component={SubscriptionSuccessPage} />
                     <ProtectedRoute path="/settings/subscription" component={SubscriptionManagementPage} />
                     
+                    {/* Profile Setup Route */}
+                    <ProtectedRoute path="/profile-setup" component={ProfileSetupPage} />
+                    
                     <Route component={NotFound} />
                   </Switch>
                 </Suspense>
@@ -220,7 +226,12 @@ const ProtectedRoute: React.FC<{
       {isLoading ? (
         <PageLoader />
       ) : user ? (
-        <Component />
+        // Check if profile is completed and redirect to setup if needed
+        !user.profileCompleted && path !== '/profile-setup' ? (
+          <Redirect to="/profile-setup" />
+        ) : (
+          <Component />
+        )
       ) : (
         <Redirect to="/auth" />
       )}

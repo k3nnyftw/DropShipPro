@@ -1,5 +1,5 @@
 import { 
-  users, type User, type InsertUser,
+  users, type User, type InsertUser, type ProfileSetup,
   products, type Product, type InsertProduct,
   suppliers, type Supplier, type InsertSupplier,
   orders, type Order, type InsertOrder,
@@ -21,6 +21,8 @@ export interface IStorage {
   updateUserPlan(userId: number, plan: SubscriptionPlan): Promise<User | undefined>;
   updateStripeCustomerId(userId: number, stripeCustomerId: string): Promise<User | undefined>;
   updateUserStripeInfo(userId: number, data: { stripeCustomerId: string, stripeSubscriptionId: string }): Promise<User | undefined>;
+  updateUserProfile(userId: number, profileData: ProfileSetup): Promise<User | undefined>;
+  markProfileCompleted(userId: number): Promise<User | undefined>;
   
   // Subscription methods
   getUserSubscription(userId: number): Promise<Subscription | undefined>;
@@ -298,7 +300,19 @@ export class MemStorage implements IStorage {
       fullName: insertUser.fullName || null,
       stripeCustomerId: insertUser.stripeCustomerId || null,
       stripeSubscriptionId: insertUser.stripeSubscriptionId || null,
-      trialEndsAt: insertUser.trialEndsAt || null
+      trialEndsAt: insertUser.trialEndsAt || null,
+      // Profile fields with defaults
+      profileCompleted: insertUser.profileCompleted || false,
+      businessName: insertUser.businessName || null,
+      businessType: insertUser.businessType || null,
+      experience: insertUser.experience || null,
+      monthlyBudget: insertUser.monthlyBudget || null,
+      targetMarkets: insertUser.targetMarkets || null,
+      interests: insertUser.interests || null,
+      goals: insertUser.goals || null,
+      preferredSuppliers: insertUser.preferredSuppliers || null,
+      timezone: insertUser.timezone || null,
+      currency: insertUser.currency || "USD"
     };
     this.users.set(id, user);
     return user;
@@ -340,6 +354,32 @@ export class MemStorage implements IStorage {
       stripeCustomerId: data.stripeCustomerId,
       stripeSubscriptionId: data.stripeSubscriptionId
     };
+    this.users.set(userId, updatedUser);
+    return updatedUser;
+  }
+  
+  async updateUserProfile(userId: number, profileData: ProfileSetup): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) {
+      return undefined;
+    }
+    
+    const updatedUser = { 
+      ...user, 
+      ...profileData,
+      profileCompleted: true
+    };
+    this.users.set(userId, updatedUser);
+    return updatedUser;
+  }
+  
+  async markProfileCompleted(userId: number): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) {
+      return undefined;
+    }
+    
+    const updatedUser = { ...user, profileCompleted: true };
     this.users.set(userId, updatedUser);
     return updatedUser;
   }

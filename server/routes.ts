@@ -17,6 +17,7 @@ import socialMediaSharingRoutes from "./routes/social-media-sharing";
 import socialMediaAccountsRoutes from "./routes/social-media-accounts";
 import subscriptionRoutes from "./routes/subscription";
 import authRoutes from "./routes/auth";
+import profileRoutes from "./routes/profile";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Register route modules
@@ -34,6 +35,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use('/api/social-media', socialMediaAccountsRoutes);
   app.use('/api/subscription', subscriptionRoutes);
   app.use('/api/auth', authRoutes);
+  app.use('/api/profile', profileRoutes);
   
   // prefix all routes with /api
   

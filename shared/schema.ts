@@ -22,6 +22,18 @@ export const users = pgTable("users", {
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
   trialEndsAt: timestamp("trial_ends_at"),
+  // Profile setup fields
+  profileCompleted: boolean("profile_completed").default(false),
+  businessName: text("business_name"),
+  businessType: text("business_type"), // e.g., "general", "electronics", "fashion", "home"
+  experience: text("experience"), // e.g., "beginner", "intermediate", "advanced"
+  monthlyBudget: decimal("monthly_budget"),
+  targetMarkets: text("target_markets").array(), // Array of markets like ["US", "UK", "CA"]
+  interests: text("interests").array(), // Array of product categories
+  goals: text("goals").array(), // Array of business goals
+  preferredSuppliers: text("preferred_suppliers").array(), // Array of supplier preferences
+  timezone: text("timezone"),
+  currency: text("currency").default("USD"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -122,7 +134,20 @@ export const insertUserSchema = createInsertSchema(users).pick({
   stripeCustomerId: true,
   stripeSubscriptionId: true,
   trialEndsAt: true,
+  profileCompleted: true,
+  businessName: true,
+  businessType: true,
+  experience: true,
+  monthlyBudget: true,
+  targetMarkets: true,
+  interests: true,
+  goals: true,
+  preferredSuppliers: true,
+  timezone: true,
+  currency: true,
 });
+
+// Profile setup schema will be defined later with proper validation
 
 export const insertProductSchema = createInsertSchema(products).pick({
   name: true,
@@ -202,6 +227,22 @@ export const insertInventoryHistorySchema = createInsertSchema(inventoryHistory)
 
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
+
+// Profile setup schema for the wizard
+export const profileSetupSchema = z.object({
+  businessName: z.string().min(2, "Business name must be at least 2 characters"),
+  businessType: z.string().min(1, "Please select a business type"),
+  experience: z.string().min(1, "Please select your experience level"),
+  monthlyBudget: z.string().min(1, "Please enter your monthly budget"),
+  targetMarkets: z.array(z.string()).min(1, "Please select at least one target market"),
+  interests: z.array(z.string()).min(1, "Please select at least one interest"),
+  goals: z.array(z.string()).min(1, "Please select at least one goal"),
+  preferredSuppliers: z.array(z.string()).optional(),
+  timezone: z.string().min(1, "Please select your timezone"),
+  currency: z.string().min(1, "Please select your currency"),
+});
+
+export type ProfileSetup = z.infer<typeof profileSetupSchema>;
 
 export type InsertProduct = z.infer<typeof insertProductSchema>;
 export type Product = typeof products.$inferSelect;
