@@ -184,7 +184,9 @@ const AuthProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const res = await fetch('/api/auth/me');
+        const res = await fetch('/api/auth/me', {
+          credentials: "include" // Include cookies in the request
+        });
         if (res.ok) {
           const userData = await res.json();
           setUser(userData);
